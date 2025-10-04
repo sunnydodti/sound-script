@@ -424,6 +424,14 @@ class RecordingProvider with ChangeNotifier {
     }
   }
   
+  // Delete recording by ID (more reliable than index)
+  Future<void> deleteRecordingById(int recordingId) async {
+    final index = _recordings.indexWhere((r) => r.id == recordingId);
+    if (index != -1) {
+      await deleteRecording(index);
+    }
+  }
+  
   // Delete recording
   Future<void> deleteRecording(int index) async {
     if (index >= 0 && index < _recordings.length) {

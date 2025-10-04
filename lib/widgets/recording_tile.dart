@@ -44,10 +44,9 @@ class RecordingTile extends StatelessWidget {
       confirmDismiss: (direction) async {
         return await _showDeleteConfirmationDialog(context);
       },
-      onDismissed: (direction) {
-        final index = recordingProvider.recordings.indexOf(recording);
-        if (index != -1) {
-          recordingProvider.deleteRecording(index);
+      onDismissed: (direction) async {
+        await recordingProvider.deleteRecordingById(recording.id);
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${recording.title} deleted')),
           );
@@ -248,15 +247,14 @@ class RecordingTile extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              final index = provider.recordings.indexOf(recording);
-              if (index != -1) {
-                provider.deleteRecording(index);
-              }
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Recording deleted')),
-              );
+              await provider.deleteRecordingById(recording.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Recording deleted')),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: recordingColor,
