@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -259,9 +260,17 @@ class _DetailsPageState extends State<DetailsPage> {
                     ),
                   ),
                   if (widget.recording.transcript != null)
-                    IconButton(
-                      icon: Icon(_isEditingTranscript ? Icons.check : Icons.edit),
-                      onPressed: () async {
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.copy),
+                          onPressed: _copyTranscriptText,
+                          tooltip: 'Copy Text',
+                        ),
+                        IconButton(
+                          icon: Icon(_isEditingTranscript ? Icons.check : Icons.edit),
+                          onPressed: () async {
                         if (_isEditingTranscript) {
                           // Get provider and find the recording
                           final provider = context.read<RecordingProvider>();
@@ -303,6 +312,8 @@ class _DetailsPageState extends State<DetailsPage> {
                         });
                       },
                       tooltip: _isEditingTranscript ? 'Save' : 'Edit',
+                    ),
+                      ],
                     ),
                 ],
               ),
@@ -679,32 +690,137 @@ class _DetailsPageState extends State<DetailsPage> {
   }
   
   void _shareRecording() async {
-    try {
-      if (widget.recording.transcript != null && widget.recording.transcript!.isNotEmpty) {
-        // Share transcript text
-        await Share.share(
-          '${widget.recording.title}\n\n${widget.recording.transcript}',
-          subject: widget.recording.title,
-        );
-      } else if (widget.recording.filePath != null) {
-        // Share audio file
-        final file = File(widget.recording.filePath!);
-        if (await file.exists()) {
-          await Share.shareXFiles(
-            [XFile(widget.recording.filePath!)],
-            text: widget.recording.title,
-          );
+    if (widget.recording.transcript == null || widget.recording.transcript!.isEmpty) {
+      // If no transcript, share audio file
+      if (widget.recording.filePath != null) {
+        try {
+          final file = File(widget.recording.filePath!);
+          if (await file.exists()) {
+            await Share.shareXFiles(
+              [XFile(widget.recording.filePath!)],
+              text: widget.recording.title,
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error sharing: $e')),
+            );
+          }
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nothing to share')),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nothing to share')),
+          );
+        }
+      }
+      return;
+    }
+    
+    // Show share options dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Share Transcript'),
+        content: const Text('How would you like to share the transcript?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _shareTextOnly();
+            },
+            child: const Text('Text Only'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _shareWithTimestamps();
+            },
+            child: const Text('With Timestamps'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _shareTextOnly() async {
+    try {
+      final transcript = widget.recording.transcript ?? '';
+      if (transcript.isNotEmpty) {
+        await Share.share(
+          '${widget.recording.title}\n\n$transcript',
+          subject: widget.recording.title,
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sharing: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing: $e')),
+        );
+      }
     }
+  }
+  
+  void _shareWithTimestamps() async {
+    try {
+      if (widget.recording.transcriptSegments.isEmpty) {
+        // No segments, share text only
+        _shareTextOnly();
+        return;
+      }
+      
+      // Build formatted transcript with timestamps
+      final buffer = StringBuffer();
+      buffer.writeln(widget.recording.title);
+      buffer.writeln();
+      
+      for (final segment in widget.recording.transcriptSegments) {
+        final timestamp = _formatTimestamp(segment.startTimeMs);
+        buffer.writeln('[$timestamp] ${segment.text}');
+      }
+      
+      await Share.share(
+        buffer.toString(),
+        subject: widget.recording.title,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing: $e')),
+        );
+      }
+    }
+  }
+  
+  void _copyTranscriptText() async {
+    try {
+      final transcript = widget.recording.transcript ?? '';
+      if (transcript.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: transcript));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Transcript copied to clipboard'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error copying: $e')),
+        );
+      }
+    }
+  }
+  
+  String _formatTimestamp(int milliseconds) {
+    final duration = Duration(milliseconds: milliseconds);
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds.remainder(60);
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
   
   String _formatDate(DateTime date) {
