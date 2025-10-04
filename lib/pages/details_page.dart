@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../data/provider/recording_provider.dart';
 import '../models/recording.dart';
+import '../models/transcript_segment.dart';
 import '../service/audio_service.dart';
 
 class DetailsPage extends StatefulWidget {
@@ -257,13 +260,45 @@ class _DetailsPageState extends State<DetailsPage> {
                   if (widget.recording.transcript != null)
                     IconButton(
                       icon: Icon(_isEditingTranscript ? Icons.check : Icons.edit),
-                      onPressed: () {
+                      onPressed: () async {
+                        if (_isEditingTranscript) {
+                          // Get provider and find the recording
+                          final provider = context.read<RecordingProvider>();
+                          final recordings = provider.recordings;
+                          final index = recordings.indexWhere((r) => r.id == widget.recording.id);
+                          
+                          if (index != -1) {
+                            // Get the actual recording from provider
+                            final recording = recordings[index];
+                            
+                            // Update transcript from edited segments
+                            if (widget.recording.transcriptSegments.isNotEmpty) {
+                              recording.transcript = widget.recording.transcriptSegments
+                                  .map((s) => s.text)
+                                  .join(' ');
+                              recording.transcriptSegments = widget.recording.transcriptSegments;
+                            } else {
+                              recording.transcript = _transcriptController.text;
+                            }
+                            
+                            recording.modified = DateTime.now();
+                            
+                            // Update in storage
+                            await provider.updateRecording(index, recording);
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Transcript updated successfully'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                        
                         setState(() {
                           _isEditingTranscript = !_isEditingTranscript;
-                          if (!_isEditingTranscript) {
-                            widget.recording.transcript = _transcriptController.text;
-                            widget.recording.modified = DateTime.now();
-                          }
                         });
                       },
                       tooltip: _isEditingTranscript ? 'Save' : 'Edit',
@@ -279,14 +314,48 @@ class _DetailsPageState extends State<DetailsPage> {
                   ? Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: TextField(
-                          controller: _transcriptController,
-                          maxLines: null,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            hintText: 'Edit transcript...',
-                          ),
-                          style: theme.textTheme.bodyMedium,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 16,
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Edit individual words. Timestamps are preserved.',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            if (widget.recording.transcriptSegments.isNotEmpty)
+                              _buildEditableSegments(theme)
+                            else
+                              TextField(
+                                controller: _transcriptController,
+                                maxLines: null,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: 'Edit transcript...',
+                                ),
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                          ],
                         ),
                       ),
                     )
@@ -415,6 +484,49 @@ class _DetailsPageState extends State<DetailsPage> {
           );
         }).toList(),
       ),
+    );
+  }
+  
+  Widget _buildEditableSegments(ThemeData theme) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: widget.recording.transcriptSegments.asMap().entries.map((entry) {
+        final index = entry.key;
+        final segment = entry.value;
+        
+        return IntrinsicWidth(
+          child: TextField(
+            controller: TextEditingController(text: segment.text),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: theme.colorScheme.outline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: theme.colorScheme.outline.withOpacity(0.5)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+              ),
+            ),
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+            onChanged: (value) {
+              // Update the segment text in real-time
+              widget.recording.transcriptSegments[index] = TranscriptSegment(
+                text: value,
+                startTimeMs: segment.startTimeMs,
+                endTimeMs: segment.endTimeMs,
+              );
+            },
+          ),
+        );
+      }).toList(),
     );
   }
   
