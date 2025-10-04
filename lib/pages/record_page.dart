@@ -450,6 +450,9 @@ class _RecordPageState extends State<RecordPage> {
               // Mode Selection Tabs
               if (!recordingProvider.isRecording && !_isListening) ...[
                 SegmentedButton<RecordingMode>(
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor: theme.colorScheme.primaryContainer,
+                  ),
                   segments: const [
                     ButtonSegment<RecordingMode>(
                       value: RecordingMode.normal,
