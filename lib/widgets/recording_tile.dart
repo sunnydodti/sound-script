@@ -15,9 +15,30 @@ class RecordingTile extends StatelessWidget {
     final theme = Theme.of(context);
     final recordingProvider = Provider.of<RecordingProvider>(context, listen: false);
     
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: ListTile(
+    return Dismissible(
+      key: Key(recording.id.toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.red,
+        child: const Icon(Icons.delete, color: Colors.white, size: 32),
+      ),
+      confirmDismiss: (direction) async {
+        return await _showDeleteConfirmationDialog(context);
+      },
+      onDismissed: (direction) {
+        final index = recordingProvider.recordings.indexOf(recording);
+        if (index != -1) {
+          recordingProvider.deleteRecording(index);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${recording.title} deleted')),
+          );
+        }
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primaryContainer,
           child: Icon(
@@ -78,7 +99,32 @@ class RecordingTile extends StatelessWidget {
         ),
         onTap: () => _navigateToRecordingScreen(context),
       ),
+      ),
     );
+  }
+  
+  Future<bool> _showDeleteConfirmationDialog(BuildContext context) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Recording'),
+        content: Text('Are you sure you want to delete "${recording.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
   Widget _buildStatusIcon(RecordingStatus status) {

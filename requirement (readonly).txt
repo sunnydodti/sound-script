@@ -60,3 +60,7 @@ Plan:
 Copilot Notes
 - do not prompt me to start modify the debugging session. User wants to continue coding.
 - Your task is to just code and not explain.
+
+
+New Scope:
+   - option to delete a recording.

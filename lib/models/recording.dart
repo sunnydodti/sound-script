@@ -49,7 +49,7 @@ class RecordingHistory {
   factory RecordingHistory.fromMap(Map<dynamic, dynamic> map) {
     return RecordingHistory(
       recordings: (map['recordings'] as List)
-          .map((item) => Recording.fromMap(item))
+          .map((item) => Recording.fromMap(Map<String, dynamic>.from(item)))
           .toList(),
     );
   }
