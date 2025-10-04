@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw Exception('Could not launch $url');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,24 +52,161 @@ class AboutPage extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Case Study Project',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
             const SizedBox(height: 32),
             
-            // Version
+            // Project Links
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      'Project Links',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     ListTile(
-                      leading: const Icon(Icons.info_outline),
-                      title: const Text('Version'),
-                      subtitle: const Text('1.0.0'),
+                      leading: const Icon(Icons.public),
+                      title: const Text('Live Demo'),
+                      subtitle: const Text('soundscript.persist.site'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://soundscript.persist.site'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.language),
+                      title: const Text('GitHub Pages'),
+                      subtitle: const Text('sunnydodti.github.io/sound-script'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://sunnydodti.github.io/sound-script'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.code),
+                      title: const Text('Source Code'),
+                      subtitle: const Text('github.com/sunnydodti/sound-script'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://github.com/sunnydodti/sound-script'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.download),
+                      title: const Text('Download'),
+                      subtitle: const Text('Latest Release'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://github.com/sunnydodti/sound-script/releases/latest'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.inventory),
+                      title: const Text('All Releases'),
+                      subtitle: const Text('View Release History'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://github.com/sunnydodti/sound-script/releases'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Developer Info
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Developer',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        child: Icon(
+                          Icons.person,
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      title: const Text(
+                        'Sunny Dodti',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text('Software Developer'),
                     ),
                     const Divider(),
                     ListTile(
-                      leading: const Icon(Icons.person_outline),
-                      title: const Text('Developer'),
-                      subtitle: const Text('Sound Script Team'),
+                      leading: const Icon(Icons.location_on, size: 20),
+                      title: const Text('Mumbai, India'),
+                      dense: true,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.email, size: 20),
+                      title: const Text('sunnydodti.dev@gmail.com'),
+                      trailing: const Icon(Icons.open_in_new, size: 16),
+                      dense: true,
+                      onTap: () => _launchUrl('mailto:sunnydodti.dev@gmail.com'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Social Links
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Connect',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      leading: const Icon(Icons.language),
+                      title: const Text('Portfolio'),
+                      subtitle: const Text('sunny.persist.site'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://sunny.persist.site'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.code),
+                      title: const Text('GitHub'),
+                      subtitle: const Text('github.com/sunnydodti'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://github.com/sunnydodti'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.business),
+                      title: const Text('LinkedIn'),
+                      subtitle: const Text('linkedin.com/in/sunnydodti'),
+                      trailing: const Icon(Icons.open_in_new, size: 20),
+                      onTap: () => _launchUrl('https://www.linkedin.com/in/sunnydodti'),
                     ),
                   ],
                 ),
@@ -118,7 +263,7 @@ class AboutPage extends StatelessWidget {
             
             // Copyright
             Text(
-              '© 2025 Sound Script',
+              'Sound Script | 2025 | Sunny Dodti',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: Colors.grey,
               ),
