@@ -24,9 +24,20 @@ class AssemblyAiService implements TranscriptionService {
         // Use provided bytes (for web or when bytes are already in memory)
         bytes = fileBytes;
       } else {
-        // Read from file path (mobile)
-        final file = File(filePath);
-        bytes = await file.readAsBytes();
+        // Check if it's a blob URL (web recording)
+        if (filePath.startsWith('blob:')) {
+          // Fetch blob URL using http package
+          final response = await http.get(Uri.parse(filePath));
+          if (response.statusCode == 200) {
+            bytes = response.bodyBytes;
+          } else {
+            throw Exception('Failed to fetch blob URL: ${response.statusCode}');
+          }
+        } else {
+          // Read from file path (mobile)
+          final file = File(filePath);
+          bytes = await file.readAsBytes();
+        }
       }
 
       final response = await http.post(

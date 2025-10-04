@@ -451,6 +451,9 @@ class RecordingProvider with ChangeNotifier {
       }
       
       _errorMessage = 'Transcription failed: $e';
+      notifyListeners();
+    } finally {
+      // Always ensure processing flag is reset
       _isProcessing = false;
       notifyListeners();
     }
