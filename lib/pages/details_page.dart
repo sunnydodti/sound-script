@@ -26,7 +26,6 @@ class _DetailsPageState extends State<DetailsPage> {
   // Playback progress
   Duration _currentPosition = Duration.zero;
   Duration _totalDuration = Duration.zero;
-  final ScrollController _transcriptScrollController = ScrollController();
   StreamSubscription<Duration>? _positionSubscription;
   
   @override
@@ -36,7 +35,7 @@ class _DetailsPageState extends State<DetailsPage> {
     _transcriptController = TextEditingController(
       text: widget.recording.transcript ?? '',
     );
-    _totalDuration = widget.recording.duration;
+    _loadAudioMetadata();
     
     // Debug: Print segment info
     print('Total segments: ${widget.recording.transcriptSegments.length}');
@@ -53,31 +52,23 @@ class _DetailsPageState extends State<DetailsPage> {
     });
   }
   
-  void _syncTranscriptScroll() {
-    if (widget.recording.transcriptSegments.isEmpty) return;
-    
-    // Find current active segment and scroll to it
-    final currentMs = _currentPosition.inMilliseconds;
-    int activeIndex = -1;
-    
-    for (int i = 0; i < widget.recording.transcriptSegments.length; i++) {
-      final segment = widget.recording.transcriptSegments[i];
-      if (currentMs >= segment.startTimeMs && currentMs <= segment.endTimeMs) {
-        activeIndex = i;
-        break;
+  Future<void> _loadAudioMetadata() async {
+    if (widget.recording.filePath != null) {
+      final duration = await _audioService.getAudioDuration(widget.recording.filePath!);
+      if (duration != null) {
+        setState(() {
+          _totalDuration = duration;
+        });
+      } else {
+        // Fallback to recorded duration
+        setState(() {
+          _totalDuration = widget.recording.duration;
+        });
       }
     }
-    
-    // Auto-scroll to active segment
-    if (activeIndex >= 0 && _transcriptScrollController.hasClients) {
-      final scrollOffset = activeIndex * 100.0; // Approximate segment width
-      _transcriptScrollController.animateTo(
-        scrollOffset,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
   }
+  
+
   
   @override
   void dispose() {
@@ -85,7 +76,6 @@ class _DetailsPageState extends State<DetailsPage> {
     _audioService.stopPlayback();
     _audioService.dispose();
     _transcriptController.dispose();
-    _transcriptScrollController.dispose();
     super.dispose();
   }
 
@@ -108,111 +98,108 @@ class _DetailsPageState extends State<DetailsPage> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title
+            // Title and Status - Compact
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.all(12),
+                child: Row(
                   children: [
-                    Text(
-                      widget.recording.title,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.recording.title,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_formatDate(widget.recording.created)} • ${_formatDuration(widget.recording.duration)}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Created: ${_formatDate(widget.recording.created)}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
-                      ),
-                    ),
-                    if (widget.recording.duration.inSeconds > 0)
-                      Text(
-                        'Duration: ${_formatDuration(widget.recording.duration)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey,
-                        ),
-                      ),
-                    const SizedBox(height: 8),
                     _buildStatusChip(),
                   ],
                 ),
               ),
             ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             
-            // Audio Player with Interactive Slider
+            // Audio Player - Compact
             if (widget.recording.filePath != null)
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Column(
                     children: [
-                      // Time labels
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDuration(_currentPosition),
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                          Text(
-                            _formatDuration(_totalDuration),
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                      // Interactive Slider
-                      Slider(
-                        value: _currentPosition.inMilliseconds.toDouble().clamp(
-                          0.0,
-                          _totalDuration.inMilliseconds.toDouble() > 0
-                              ? _totalDuration.inMilliseconds.toDouble()
-                              : 1.0,
-                        ),
-                        max: _totalDuration.inMilliseconds.toDouble() > 0
-                            ? _totalDuration.inMilliseconds.toDouble()
-                            : 1.0,
-                        onChanged: (value) {
-                          setState(() {
-                            _currentPosition = Duration(milliseconds: value.toInt());
-                          });
-                        },
-                        onChangeEnd: (value) {
-                          _audioService.seekTo(Duration(milliseconds: value.toInt()));
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      // Playback controls
+                      // Playback controls - centered
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton(
                             icon: const Icon(Icons.replay_10),
-                            iconSize: 32,
+                            iconSize: 28,
                             onPressed: _isInitialized ? _skipBackward : null,
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 8),
                           IconButton(
                             icon: Icon(
                               _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
                             ),
-                            iconSize: 64,
+                            iconSize: 56,
                             onPressed: _isInitialized ? _togglePlayback : null,
                             color: theme.colorScheme.primary,
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.forward_10),
-                            iconSize: 32,
+                            iconSize: 28,
                             onPressed: _isInitialized ? _skipForward : null,
+                          ),
+                        ],
+                      ),
+                      // Slider with time labels
+                      Row(
+                        children: [
+                          Text(
+                            _formatDuration(_currentPosition),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          Expanded(
+                            child: Slider(
+                              value: _currentPosition.inMilliseconds.toDouble().clamp(
+                                0.0,
+                                _totalDuration.inMilliseconds.toDouble() > 0
+                                    ? _totalDuration.inMilliseconds.toDouble()
+                                    : 1.0,
+                              ),
+                              max: _totalDuration.inMilliseconds.toDouble() > 0
+                                  ? _totalDuration.inMilliseconds.toDouble()
+                                  : 1.0,
+                              onChanged: (value) {
+                                setState(() {
+                                  _currentPosition = Duration(milliseconds: value.toInt());
+                                });
+                              },
+                              onChangeEnd: (value) {
+                                _audioService.seekTo(Duration(milliseconds: value.toInt()));
+                              },
+                            ),
+                          ),
+                          Text(
+                            _formatDuration(_totalDuration),
+                            style: theme.textTheme.bodySmall,
                           ),
                         ],
                       ),
@@ -221,107 +208,192 @@ class _DetailsPageState extends State<DetailsPage> {
                 ),
               ),
             
-            const SizedBox(height: 16),
-            
-            // Transcript
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Transcript',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+            // Live Scrolling Words (only during playback)
+            if (_isPlaying && widget.recording.transcriptSegments.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                if (widget.recording.transcript != null)
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _isEditingTranscript = !_isEditingTranscript;
-                        if (!_isEditingTranscript) {
-                          // Save changes
-                          widget.recording.transcript = _transcriptController.text;
-                          widget.recording.modified = DateTime.now();
-                        }
-                      });
-                    },
-                    icon: Icon(_isEditingTranscript ? Icons.check : Icons.edit),
-                    label: Text(_isEditingTranscript ? 'Save' : 'Edit'),
+                child: _buildLiveScrollingWords(theme),
+              ),
+            
+            const SizedBox(height: 12),
+            
+            // Transcript header - compact
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Transcript',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: widget.recording.transcript != null
-                    ? _isEditingTranscript
-                        ? TextField(
-                            controller: _transcriptController,
-                            maxLines: null,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              hintText: 'Edit transcript...',
-                            ),
-                            style: theme.textTheme.bodyLarge,
-                          )
-                        : widget.recording.transcriptSegments.isNotEmpty
-                            ? _buildSynchronizedTranscript(theme)
-                            : SelectableText(
-                                widget.recording.transcript!,
-                                style: theme.textTheme.bodyLarge,
-                              )
-                    : widget.recording.status == RecordingStatus.processing
-                        ? const Center(
-                            child: Column(
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 16),
-                                Text('Transcribing audio...'),
-                              ],
-                            ),
-                          )
-                        : Text(
-                            'No transcript available',
-                            style: TextStyle(
-                              fontStyle: FontStyle.italic,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                  if (widget.recording.transcript != null)
+                    IconButton(
+                      icon: Icon(_isEditingTranscript ? Icons.check : Icons.edit),
+                      onPressed: () {
+                        setState(() {
+                          _isEditingTranscript = !_isEditingTranscript;
+                          if (!_isEditingTranscript) {
+                            widget.recording.transcript = _transcriptController.text;
+                            widget.recording.modified = DateTime.now();
+                          }
+                        });
+                      },
+                      tooltip: _isEditingTranscript ? 'Save' : 'Edit',
+                    ),
+                ],
               ),
             ),
+            const SizedBox(height: 4),
+            
+            // Full Transcript
+            if (widget.recording.transcript != null)
+              _isEditingTranscript
+                  ? Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: TextField(
+                          controller: _transcriptController,
+                          maxLines: null,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'Edit transcript...',
+                          ),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    )
+                  : widget.recording.transcriptSegments.isNotEmpty
+                      ? _buildFullTranscript(theme)
+                      : Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: SelectableText(
+                              widget.recording.transcript!,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        )
+            else if (widget.recording.status == RecordingStatus.processing)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Transcribing audio...'),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'No transcript available',
+                    style: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
   
-  Widget _buildSynchronizedTranscript(ThemeData theme) {
+  // Live scrolling words display (3-4 words at a time)
+  Widget _buildLiveScrollingWords(ThemeData theme) {
     final currentMs = _currentPosition.inMilliseconds;
+    final segments = widget.recording.transcriptSegments;
+    
+    // Find active segment index
+    int activeSegmentIndex = -1;
+    for (int i = 0; i < segments.length; i++) {
+      if (currentMs >= segments[i].startTimeMs && currentMs <= segments[i].endTimeMs) {
+        activeSegmentIndex = i;
+        break;
+      }
+    }
+    
+    if (activeSegmentIndex == -1) {
+      return const SizedBox(height: 50);
+    }
+    
+    // Get 3-4 words: 1 before, current, 2 after
+    final startIndex = (activeSegmentIndex - 1).clamp(0, segments.length - 1);
+    final endIndex = (activeSegmentIndex + 2).clamp(0, segments.length - 1);
     
     return SizedBox(
-      height: 120,
-      child: SingleChildScrollView(
-        controller: _transcriptScrollController,
+      height: 50,
+      child: ListView(
         scrollDirection: Axis.horizontal,
-        child: Row(
-          children: widget.recording.transcriptSegments.asMap().entries.map((entry) {
-            final segment = entry.value;
-            final isActive = currentMs >= segment.startTimeMs && currentMs <= segment.endTimeMs;
-            
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                segment.text,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.5),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  fontSize: isActive ? 24 : 18,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          for (int i = startIndex; i <= endIndex; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Center(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    color: i == activeSegmentIndex
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onPrimaryContainer.withOpacity(0.5),
+                    fontSize: i == activeSegmentIndex ? 24 : 18,
+                    fontWeight: i == activeSegmentIndex ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  child: Text(segments[i].text),
                 ),
               ),
-            );
-          }).toList(),
-        ),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  // Full transcript with wrap layout
+  Widget _buildFullTranscript(ThemeData theme) {
+    final currentMs = _currentPosition.inMilliseconds;
+    final segments = widget.recording.transcriptSegments;
+    
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: segments.map((segment) {
+          final isActive = _isPlaying && 
+              currentMs >= segment.startTimeMs && 
+              currentMs <= segment.endTimeMs;
+          
+          return Text(
+            '${segment.text} ',
+            style: TextStyle(
+              color: isActive 
+                ? theme.colorScheme.primary 
+                : theme.colorScheme.onSurface.withOpacity(0.8),
+              fontSize: 16,
+              fontWeight: FontWeight.normal,
+              backgroundColor: isActive 
+                ? theme.colorScheme.primary.withOpacity(0.1)
+                : null,
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -400,7 +472,6 @@ class _DetailsPageState extends State<DetailsPage> {
                 setState(() {
                   _currentPosition = position;
                 });
-                _syncTranscriptScroll();
               }
             },
             onError: (error) {

@@ -168,10 +168,48 @@ class AudioService {
     }
   }
   
-  // Get current duration
-  Future<Duration?> getDuration(String path) async {
-    // For flutter_sound, duration is usually available during playback
-    return null;
+  // Get audio file duration from metadata
+  Future<Duration?> getAudioDuration(String path) async {
+    if (!_isPlayerInitialized) {
+      await initPlayer();
+    }
+    
+    try {
+      // Start player to get duration, then immediately stop
+      await _player!.startPlayer(
+        fromURI: path,
+        codec: Codec.aacADTS,
+      );
+      
+      // Wait briefly for player to load metadata
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Get duration from player state
+      final progress = await _player!.getProgress();
+      final totalDuration = progress['duration'];
+      
+      // Stop immediately
+      await _player!.stopPlayer();
+      
+      return totalDuration;
+    } catch (e) {
+      print('Error getting audio duration: $e');
+      return null;
+    }
+  }
+  
+  // Get current playback duration
+  Future<Duration?> getCurrentDuration() async {
+    try {
+      if (_player != null && _player!.isPlaying) {
+        final progress = await _player!.getProgress();
+        return progress['duration'];
+      }
+      return null;
+    } catch (e) {
+      print('Error getting current duration: $e');
+      return null;
+    }
   }
   
   // Dispose resources
