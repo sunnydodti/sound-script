@@ -75,6 +75,7 @@ class AudioService {
       await _recorder!.startRecorder(
         toFile: path,
         codec: Codec.aacADTS,
+        audioSource: AudioSource.microphone, // Only record from microphone, not system audio
       );
       
       return path;
