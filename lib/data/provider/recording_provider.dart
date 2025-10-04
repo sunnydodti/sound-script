@@ -154,8 +154,8 @@ class RecordingProvider with ChangeNotifier {
     }
   }
   
-  // Stop recording
-  Future<void> stopRecording() async {
+  // Stop recording (does not auto-transcribe)
+  Future<void> stopRecording({bool autoTranscribe = false}) async {
     try {
       _durationTimer?.cancel();
       
@@ -174,15 +174,56 @@ class RecordingProvider with ChangeNotifier {
       _isRecording = false;
       notifyListeners();
       
-      // Auto-save and transcribe
+      // Save recording
       await addRecording(_currentRecording!);
-      await transcribeRecording(_currentRecording!);
+      
+      // Optionally auto-transcribe
+      if (autoTranscribe) {
+        await transcribeRecording(_currentRecording!);
+      }
       
     } catch (e) {
       _errorMessage = 'Error stopping recording: $e';
       _isRecording = false;
       notifyListeners();
     }
+  }
+  
+  // Manual transcribe for current recording
+  Future<void> transcribeCurrentRecording() async {
+    if (_currentRecording != null && _currentRecording!.filePath != null) {
+      await transcribeRecording(_currentRecording!);
+    }
+  }
+  
+  // Reset current recording to start fresh
+  void resetCurrentRecording() {
+    _currentRecording = null;
+    _recordingDuration = Duration.zero;
+    notifyListeners();
+  }
+  
+  // Preview playback for current recording
+  bool _isPlayingPreview = false;
+  bool get isPlayingPreview => _isPlayingPreview;
+  
+  Future<void> togglePreviewPlayback() async {
+    if (_currentRecording == null || _currentRecording!.filePath == null) return;
+    
+    if (_isPlayingPreview) {
+      await _audioService.stopPlayback();
+      _isPlayingPreview = false;
+    } else {
+      final success = await _audioService.playAudio(
+        _currentRecording!.filePath!,
+        whenFinished: () {
+          _isPlayingPreview = false;
+          notifyListeners();
+        },
+      );
+      _isPlayingPreview = success;
+    }
+    notifyListeners();
   }
   
   // Pick audio file from device
@@ -225,16 +266,21 @@ class RecordingProvider with ChangeNotifier {
           return;
         }
         
+        // Get audio duration
+        final duration = await _audioService.getAudioDuration(file.path);
+        
         // Create recording from file
-        final recording = Recording()
+        _currentRecording = Recording()
           ..title = fileName.replaceAll(RegExp(r'\.(mp3|wav|aac|m4a|ogg|flac)$', caseSensitive: false), '')
           ..filePath = file.path
+          ..duration = duration ?? Duration.zero
           ..status = RecordingStatus.completed
           ..created = DateTime.now()
           ..modified = DateTime.now();
         
-        await addRecording(recording);
-        await transcribeRecording(recording);
+        await addRecording(_currentRecording!);
+        // Don't auto-transcribe, let user preview first
+        notifyListeners();
       }
     } catch (e) {
       _errorMessage = 'Error picking file: $e';
@@ -246,14 +292,35 @@ class RecordingProvider with ChangeNotifier {
   Future<void> transcribeRecording(Recording recording) async {
     try {
       _isProcessing = true;
-      recording.status = RecordingStatus.processing;
       notifyListeners();
       
-      // Get transcript result from service
+      // Get transcript result from service with status callbacks
       final result = await _transcriptionService.transcribeAudio(
         recording.filePath ?? '',
         onStatusUpdate: (status, message) {
           print('Transcription status: $status - $message');
+          
+          // Update recording status based on transcription service status
+          switch (status) {
+            case TranscriptionStatus.uploading:
+              recording.status = RecordingStatus.uploading;
+              break;
+            case TranscriptionStatus.uploaded:
+              recording.status = RecordingStatus.uploading;
+              break;
+            case TranscriptionStatus.processing:
+              recording.status = RecordingStatus.processing;
+              break;
+            case TranscriptionStatus.completed:
+              recording.status = RecordingStatus.completed;
+              break;
+            case TranscriptionStatus.error:
+              recording.status = RecordingStatus.failed;
+              break;
+            default:
+              break;
+          }
+          notifyListeners();
         },
       );
       
