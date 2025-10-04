@@ -5,6 +5,7 @@ class Recording {
   String title = 'Recording_${DateTime.now().toIso8601String()}';
   String? filePath;
   String? transcript;
+  Duration duration = Duration.zero;
   
   DateTime created = DateTime.now();
   DateTime modified = DateTime.now();
@@ -17,10 +18,10 @@ class Recording {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      if (title != null)  'title': title,
+      'title': title,
       if (filePath != null)  'filePath': filePath,
       if (transcript != null)  'transcript': transcript,
-      
+      'duration': duration.inMilliseconds,
       'created': created.toIso8601String(),
       'modified': modified.toIso8601String(),
       'status': status.index,
@@ -29,9 +30,10 @@ class Recording {
 
   Recording.fromMap(Map<String, dynamic> map) {
     id = map['id'];
-    title = map['title'];
+    title = map['title'] ?? 'Recording_${DateTime.now().toIso8601String()}';
     filePath = map['filePath'];
     transcript = map['transcript'];
+    duration = Duration(milliseconds: map['duration'] ?? 0);
     created = DateTime.parse(map['created']);
     modified = DateTime.parse(map['modified']);
     status = RecordingStatus.values[map['status']];
