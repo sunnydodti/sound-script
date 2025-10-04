@@ -58,7 +58,7 @@ Plan:
    - Ensure the app handles errors gracefully and provides clear feedback to the user. 
 
 Copilot Notes
-- do not prompt me to start modify the debugging session. User wants to continue coding.
+- do not prompt me to start/modify the debugging session. User wants to continue coding. no flutter commands
 - Your task is to just code and not explain.
 
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/theme.dart';
+
 class ColoredTextBox extends StatelessWidget {
   final String text;
   final Color color;
@@ -32,7 +34,7 @@ class ColoredTextBox extends StatelessWidget {
   factory ColoredTextBox.red(String text, {double fontSize = 13, upperCase = true}) =>
       ColoredTextBox(
         text: text,
-        color: Colors.red,
+        color: recordingColor,
         fontSize: fontSize,
         upperCase: upperCase,
       );

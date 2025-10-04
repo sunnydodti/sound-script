@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 MaterialColor accentColor = Colors.blue;
 
+// Recording/Mic color - consistent throughout the app
+Color recordingColor = Colors.red.shade700;
+
 ThemeData lightTheme = ThemeData(
   colorScheme: ColorScheme.light(
     primary: accentColor,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../data/theme.dart';
 import '../models/recording.dart';
 import '../pages/details_page.dart';
 import '../data/provider/recording_provider.dart';
@@ -21,10 +22,10 @@ class RecordingTile extends StatelessWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: theme.colorScheme.errorContainer,
-        child: Icon(
+        color: recordingColor,
+        child: const Icon(
           Icons.delete, 
-          color: theme.colorScheme.onErrorContainer, 
+          color: Colors.white, 
           size: 32,
         ),
       ),
@@ -93,9 +94,9 @@ class RecordingTile extends StatelessWidget {
               value: 'delete',
               child: Row(
                 children: [
-                  Icon(Icons.delete, color: theme.colorScheme.error),
+                  Icon(Icons.delete, color: recordingColor),
                   const SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: theme.colorScheme.error)),
+                  Text('Delete', style: TextStyle(color: recordingColor)),
                 ],
               ),
             ),
@@ -108,8 +109,6 @@ class RecordingTile extends StatelessWidget {
   }
   
   Future<bool> _showDeleteConfirmationDialog(BuildContext context) async {
-    final theme = Theme.of(context);
-    
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -123,8 +122,8 @@ class RecordingTile extends StatelessWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: theme.colorScheme.onError,
+              backgroundColor: recordingColor,
+              foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),
           ),
@@ -140,7 +139,7 @@ class RecordingTile extends StatelessWidget {
     switch (status) {
       case RecordingStatus.recording:
         icon = Icons.fiber_manual_record;
-        color = theme.colorScheme.error;
+        color = recordingColor;
         break;
       case RecordingStatus.uploading:
         icon = Icons.cloud_upload;
@@ -156,7 +155,7 @@ class RecordingTile extends StatelessWidget {
         break;
       case RecordingStatus.failed:
         icon = Icons.error;
-        color = theme.colorScheme.error;
+        color = recordingColor;
         break;
     }
     
@@ -241,7 +240,7 @@ class RecordingTile extends StatelessWidget {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: recordingColor,
               foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),

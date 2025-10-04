@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../data/provider/recording_provider.dart';
+import '../data/theme.dart';
+
+enum RecordingMode { normal, live, file }
 
 class RecordPage extends StatefulWidget {
   const RecordPage({super.key});
@@ -12,6 +16,47 @@ class RecordPage extends StatefulWidget {
 
 class _RecordPageState extends State<RecordPage> {
   String _lastSuccessMessage = '';
+  RecordingMode _selectedMode = RecordingMode.normal;
+  
+  // Live transcription
+  late stt.SpeechToText _speechToText;
+  bool _speechEnabled = false;
+  String _liveTranscript = '';
+  bool _isListening = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _initSpeech();
+  }
+  
+  void _initSpeech() async {
+    _speechToText = stt.SpeechToText();
+    _speechEnabled = await _speechToText.initialize();
+    setState(() {});
+  }
+  
+  void _startLiveListening() async {
+    await _speechToText.listen(
+      onResult: (result) {
+        setState(() {
+          _liveTranscript = result.recognizedWords;
+        });
+      },
+    );
+    setState(() => _isListening = true);
+  }
+  
+  void _stopLiveListening() async {
+    await _speechToText.stop();
+    setState(() => _isListening = false);
+  }
+  
+  @override
+  void dispose() {
+    _speechToText.stop();
+    super.dispose();
+  }
   
   void _showFileRequirements(BuildContext context) {
     final theme = Theme.of(context);
@@ -109,126 +154,63 @@ class _RecordPageState extends State<RecordPage> {
     }
     
     return Scaffold(
-      body: Center(
+      body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Recording status
-              if (recordingProvider.isRecording) ...[
-                Icon(
-                  Icons.mic,
-                  size: 80,
-                  color: theme.colorScheme.error,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Recording...',
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _formatDuration(recordingProvider.recordingDuration),
-                  style: theme.textTheme.displayMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                ElevatedButton.icon(
-                  onPressed: () => recordingProvider.stopRecording(),
-                  icon: const Icon(Icons.stop),
-                  label: const Text('Stop Recording'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.error,
-                    foregroundColor: theme.colorScheme.onError,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
+              const SizedBox(height: 60),
+              
+              // Mode Selection Tabs
+              if (!recordingProvider.isRecording && !_isListening) ...[
+                SegmentedButton<RecordingMode>(
+                  segments: const [
+                    ButtonSegment<RecordingMode>(
+                      value: RecordingMode.normal,
+                      label: Text('Record'),
+                      icon: Icon(Icons.fiber_manual_record),
                     ),
-                  ),
-                ),
-              ] else ...[
-                Icon(
-                  Icons.mic_none,
-                  size: 80,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Ready to Record',
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 48),
-                
-                // Record button
-                ElevatedButton.icon(
-                  onPressed: recordingProvider.isProcessing
-                      ? null
-                      : () => recordingProvider.startRecording(),
-                  icon: const Icon(Icons.fiber_manual_record),
-                  label: const Text('Start Recording'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
+                    ButtonSegment<RecordingMode>(
+                      value: RecordingMode.live,
+                      label: Text('Live'),
+                      icon: Icon(Icons.record_voice_over),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Divider
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Row(
-                    children: [
-                      Expanded(child: Divider()),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR'),
-                      ),
-                      Expanded(child: Divider()),
-                    ],
-                  ),
-                ),
-                
-                // Pick file button
-                OutlinedButton.icon(
-                  onPressed: recordingProvider.isProcessing
-                      ? null
-                      : () => recordingProvider.pickAudioFile(),
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Choose Audio File'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
+                    ButtonSegment<RecordingMode>(
+                      value: RecordingMode.file,
+                      label: Text('File'),
+                      icon: Icon(Icons.folder_open),
                     ),
-                  ),
+                  ],
+                  selected: {_selectedMode},
+                  onSelectionChanged: (Set<RecordingMode> newSelection) {
+                    setState(() {
+                      _selectedMode = newSelection.first;
+                      _liveTranscript = '';
+                    });
+                  },
                 ),
-                const SizedBox(height: 8),
-                
-                // File requirements info
-                TextButton.icon(
-                  onPressed: () => _showFileRequirements(context),
-                  icon: const Icon(Icons.info_outline, size: 18),
-                  label: const Text(
-                    'File Requirements (Max 50 MB)',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
+                const SizedBox(height: 32),
               ],
+              
+              // Content based on selected mode
+              if (_selectedMode == RecordingMode.normal)
+                _buildNormalRecordingMode(recordingProvider, theme)
+              else if (_selectedMode == RecordingMode.live)
+                _buildLiveTranscriptionMode(theme)
+              else
+                _buildFileSelectionMode(recordingProvider, theme),
               
               // Processing indicator
               if (recordingProvider.isProcessing) ...[
                 const SizedBox(height: 32),
-                const CircularProgressIndicator(),
+                const Center(child: CircularProgressIndicator()),
                 const SizedBox(height: 16),
-                Text(
-                  'Transcribing audio...',
-                  style: theme.textTheme.bodyLarge,
+                Center(
+                  child: Text(
+                    'Transcribing audio...',
+                    style: theme.textTheme.bodyLarge,
+                  ),
                 ),
               ],
               
@@ -269,42 +251,224 @@ class _RecordPageState extends State<RecordPage> {
                   ),
                 ),
               ],
-              
-              // Info card when idle
-              if (!recordingProvider.isRecording && !recordingProvider.isProcessing) ...[
-                const SizedBox(height: 32),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: theme.colorScheme.primary.withOpacity(0.5),
-                    ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildNormalRecordingMode(RecordingProvider provider, ThemeData theme) {
+    if (provider.isRecording) {
+      return Center(
+        child: Column(
+          children: [
+            Icon(Icons.mic, size: 80, color: recordingColor),
+            const SizedBox(height: 24),
+            Text('Recording...', style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 16),
+            Text(
+              _formatDuration(provider.recordingDuration),
+              style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 48),
+            ElevatedButton.icon(
+              onPressed: () => provider.stopRecording(),
+              icon: const Icon(Icons.stop),
+              label: const Text('Stop Recording'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: recordingColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return Center(
+      child: Column(
+        children: [
+          Icon(Icons.mic_none, size: 80, color: theme.colorScheme.primary),
+          const SizedBox(height: 24),
+          Text('Ready to Record', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 48),
+          ElevatedButton.icon(
+            onPressed: provider.isProcessing ? null : () => provider.startRecording(),
+            icon: const Icon(Icons.fiber_manual_record),
+            label: const Text('Start Recording'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: recordingColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: theme.colorScheme.onPrimaryContainer),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Audio will be saved and transcribed automatically',
+                    style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontSize: 12),
                   ),
-                  child: Row(
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildLiveTranscriptionMode(ThemeData theme) {
+    return Center(
+      child: Column(
+        children: [
+          Icon(
+            _isListening ? Icons.mic : Icons.mic_none,
+            size: 80,
+            color: _isListening ? recordingColor : theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            _isListening ? 'Listening...' : 'Ready for Live Transcription',
+            style: theme.textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 48),
+          ElevatedButton.icon(
+            onPressed: _speechEnabled 
+                ? (_isListening ? _stopLiveListening : _startLiveListening)
+                : null,
+            icon: Icon(_isListening ? Icons.stop : Icons.mic),
+            label: Text(_isListening ? 'Stop Listening' : 'Start Listening'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: recordingColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            ),
+          ),
+          const SizedBox(height: 32),
+          if (_liveTranscript.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.colorScheme.outline),
+              ),
+              constraints: const BoxConstraints(minHeight: 150),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Icon(
-                        Icons.check_circle, 
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Accepted: MP3, WAV, AAC, M4A, OGG, FLAC • Max 50 MB',
-                          style: TextStyle(
-                            color: theme.colorScheme.onPrimaryContainer,
-                            fontSize: 12,
-                          ),
+                      Icon(Icons.text_fields, color: theme.colorScheme.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Live Transcript',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _liveTranscript,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: theme.colorScheme.onPrimaryContainer),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Speak to see real-time transcription. No recording saved.',
+                      style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildFileSelectionMode(RecordingProvider provider, ThemeData theme) {
+    return Center(
+      child: Column(
+        children: [
+          Icon(Icons.folder_open, size: 80, color: theme.colorScheme.primary),
+          const SizedBox(height: 24),
+          Text('Select Audio File', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 48),
+          OutlinedButton.icon(
+            onPressed: provider.isProcessing ? null : () => provider.pickAudioFile(),
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Choose Audio File'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: () => _showFileRequirements(context),
+            icon: const Icon(Icons.info_outline, size: 18),
+            label: const Text(
+              'File Requirements (Max 50 MB)',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: theme.colorScheme.primary.withOpacity(0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle, 
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Accepted: MP3, WAV, AAC, M4A, OGG, FLAC • Max 50 MB',
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
