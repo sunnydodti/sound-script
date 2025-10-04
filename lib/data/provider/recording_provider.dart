@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:file_picker/file_picker.dart';
+// Conditional import for web blob support
+import 'dart:html' as html show Blob, Url;
+import 'dart:typed_data' show Uint8List;
 
 import '../../models/recording.dart';
 import '../../models/transcript_segment.dart';
@@ -273,7 +276,7 @@ class RecordingProvider with ChangeNotifier {
         List<int>? webBytes;
         
         if (kIsWeb) {
-          // Web: Get file bytes for later upload
+          // Web: Get file bytes and create blob URL
           final bytes = result.files.single.bytes;
           if (bytes == null) {
             _errorMessage = 'Unable to read file bytes';
@@ -282,8 +285,11 @@ class RecordingProvider with ChangeNotifier {
           }
           
           webBytes = bytes;
-          // Use file name as path identifier
-          filePath = fileName;
+          
+          // Create blob URL for playback on web
+          final blob = html.Blob([Uint8List.fromList(bytes)]);
+          filePath = html.Url.createObjectUrlFromBlob(blob);
+          
           // For web, we'll estimate duration or set a default
           duration = Duration.zero;
         } else {
