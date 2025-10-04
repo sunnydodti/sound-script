@@ -11,10 +11,102 @@ class RecordPage extends StatefulWidget {
 }
 
 class _RecordPageState extends State<RecordPage> {
+  String _lastSuccessMessage = '';
+  
+  void _showFileRequirements(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('File Requirements'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Supported Audio Formats:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text('• MP3\n• WAV\n• AAC\n• M4A\n• OGG\n• FLAC'),
+            const SizedBox(height: 16),
+            const Text(
+              'File Size Limit:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text('• Maximum 50 MB per file'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.tips_and_updates, 
+                    size: 20, 
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Tip: Shorter files transcribe faster!',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     final recordingProvider = context.watch<RecordingProvider>();
     final theme = Theme.of(context);
+    
+    // Show success message as SnackBar
+    if (recordingProvider.successMessage.isNotEmpty && 
+        recordingProvider.successMessage != _lastSuccessMessage) {
+      _lastSuccessMessage = recordingProvider.successMessage;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(recordingProvider.successMessage),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      });
+    }
     
     return Scaffold(
       body: Center(
@@ -28,7 +120,7 @@ class _RecordPageState extends State<RecordPage> {
                 Icon(
                   Icons.mic,
                   size: 80,
-                  color: Colors.red,
+                  color: theme.colorScheme.error,
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -48,8 +140,8 @@ class _RecordPageState extends State<RecordPage> {
                   icon: const Icon(Icons.stop),
                   label: const Text('Stop Recording'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
+                    backgroundColor: theme.colorScheme.error,
+                    foregroundColor: theme.colorScheme.onError,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 32,
                       vertical: 16,
@@ -116,6 +208,17 @@ class _RecordPageState extends State<RecordPage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                
+                // File requirements info
+                TextButton.icon(
+                  onPressed: () => _showFileRequirements(context),
+                  icon: const Icon(Icons.info_outline, size: 18),
+                  label: const Text(
+                    'File Requirements (Max 50 MB)',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
               ],
               
               // Processing indicator
@@ -135,24 +238,65 @@ class _RecordPageState extends State<RecordPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: theme.colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
+                    border: Border.all(
+                      color: theme.colorScheme.error.withOpacity(0.5),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade700),
+                      Icon(
+                        Icons.error_outline, 
+                        color: theme.colorScheme.onErrorContainer,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           recordingProvider.errorMessage,
-                          style: TextStyle(color: Colors.red.shade700),
+                          style: TextStyle(
+                            color: theme.colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => recordingProvider.clearError(),
-                        color: Colors.red.shade700,
+                        color: theme.colorScheme.onErrorContainer,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
+              // Info card when idle
+              if (!recordingProvider.isRecording && !recordingProvider.isProcessing) ...[
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle, 
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Accepted: MP3, WAV, AAC, M4A, OGG, FLAC • Max 50 MB',
+                          style: TextStyle(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                     ],
                   ),

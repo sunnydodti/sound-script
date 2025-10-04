@@ -26,6 +26,7 @@ class RecordingProvider with ChangeNotifier {
   bool _isRecording = false;
   bool _isProcessing = false;
   String _errorMessage = '';
+  String _successMessage = '';
 
   List<Recording> get recordings => List.unmodifiable(_recordings);
   Recording? get currentRecording => _currentRecording;
@@ -33,6 +34,7 @@ class RecordingProvider with ChangeNotifier {
   bool get isRecording => _isRecording;
   bool get isProcessing => _isProcessing;
   String get errorMessage => _errorMessage;
+  String get successMessage => _successMessage;
   
   Future<void> _init() async {
     await _audioService.initRecorder();
@@ -186,17 +188,43 @@ class RecordingProvider with ChangeNotifier {
       _errorMessage = '';
       
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'],
         allowMultiple: false,
       );
       
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
         final fileName = result.files.single.name;
+        final fileSize = result.files.single.size;
+        
+        // Validate file size (50 MB limit)
+        const maxSizeInBytes = 50 * 1024 * 1024; // 50 MB
+        if (fileSize > maxSizeInBytes) {
+          _errorMessage = 'File size exceeds 50 MB limit. Selected file is ${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+          notifyListeners();
+          return;
+        }
+        
+        // Validate file extension
+        final extension = fileName.split('.').last.toLowerCase();
+        final allowedExtensions = ['mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'];
+        if (!allowedExtensions.contains(extension)) {
+          _errorMessage = 'Invalid file type. Please select an audio file (MP3, WAV, AAC, M4A, OGG, FLAC)';
+          notifyListeners();
+          return;
+        }
+        
+        // Check if file exists
+        if (!await file.exists()) {
+          _errorMessage = 'Selected file does not exist';
+          notifyListeners();
+          return;
+        }
         
         // Create recording from file
         final recording = Recording()
-          ..title = fileName.replaceAll('.aac', '').replaceAll('.mp3', '')
+          ..title = fileName.replaceAll(RegExp(r'\.(mp3|wav|aac|m4a|ogg|flac)$', caseSensitive: false), '')
           ..filePath = file.path
           ..status = RecordingStatus.completed
           ..created = DateTime.now()
@@ -232,7 +260,14 @@ class RecordingProvider with ChangeNotifier {
       }
       
       _isProcessing = false;
+      _successMessage = 'Transcription completed successfully!';
       notifyListeners();
+      
+      // Auto-clear success message after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        _successMessage = '';
+        notifyListeners();
+      });
     } catch (e) {
       recording.status = RecordingStatus.failed;
       _errorMessage = 'Transcription failed: $e';
@@ -273,6 +308,12 @@ class RecordingProvider with ChangeNotifier {
   // Clear error message
   void clearError() {
     _errorMessage = '';
+    notifyListeners();
+  }
+  
+  // Clear success message
+  void clearSuccess() {
+    _successMessage = '';
     notifyListeners();
   }
   

@@ -21,8 +21,12 @@ class RecordingTile extends StatelessWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white, size: 32),
+        color: theme.colorScheme.errorContainer,
+        child: Icon(
+          Icons.delete, 
+          color: theme.colorScheme.onErrorContainer, 
+          size: 32,
+        ),
       ),
       confirmDismiss: (direction) async {
         return await _showDeleteConfirmationDialog(context);
@@ -66,7 +70,7 @@ class RecordingTile extends StatelessWidget {
           ],
         ),
         trailing: PopupMenuButton<String>(
-          icon: _buildStatusIcon(recording.status),
+          icon: _buildStatusIcon(recording.status, theme),
           onSelected: (value) {
             if (value == 'delete') {
               _showDeleteConfirmation(context, recordingProvider);
@@ -85,13 +89,13 @@ class RecordingTile extends StatelessWidget {
                 ],
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
-                  Icon(Icons.delete, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: Colors.red)),
+                  Icon(Icons.delete, color: theme.colorScheme.error),
+                  const SizedBox(width: 8),
+                  Text('Delete', style: TextStyle(color: theme.colorScheme.error)),
                 ],
               ),
             ),
@@ -104,6 +108,8 @@ class RecordingTile extends StatelessWidget {
   }
   
   Future<bool> _showDeleteConfirmationDialog(BuildContext context) async {
+    final theme = Theme.of(context);
+    
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -117,8 +123,8 @@ class RecordingTile extends StatelessWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
             child: const Text('Delete'),
           ),
@@ -127,30 +133,30 @@ class RecordingTile extends StatelessWidget {
     ) ?? false;
   }
 
-  Widget _buildStatusIcon(RecordingStatus status) {
+  Widget _buildStatusIcon(RecordingStatus status, ThemeData theme) {
     IconData icon;
     Color color;
     
     switch (status) {
       case RecordingStatus.recording:
         icon = Icons.fiber_manual_record;
-        color = Colors.red;
+        color = theme.colorScheme.error;
         break;
       case RecordingStatus.uploading:
         icon = Icons.cloud_upload;
-        color = Colors.orange;
+        color = theme.colorScheme.tertiary;
         break;
       case RecordingStatus.processing:
         icon = Icons.hourglass_empty;
-        color = Colors.blue;
+        color = theme.colorScheme.primary;
         break;
       case RecordingStatus.completed:
         icon = Icons.check_circle;
-        color = Colors.green;
+        color = Colors.green; // Keep green as it's universally recognized for success
         break;
       case RecordingStatus.failed:
         icon = Icons.error;
-        color = Colors.red;
+        color = theme.colorScheme.error;
         break;
     }
     

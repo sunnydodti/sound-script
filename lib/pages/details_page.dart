@@ -199,11 +199,11 @@ class _DetailsPageState extends State<DetailsPage> {
                               ],
                             ),
                           )
-                        : const Text(
+                        : Text(
                             'No transcript available',
                             style: TextStyle(
                               fontStyle: FontStyle.italic,
-                              color: Colors.grey,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
               ),
@@ -215,28 +215,29 @@ class _DetailsPageState extends State<DetailsPage> {
   }
   
   Widget _buildStatusChip() {
+    final theme = Theme.of(context);
     Color color;
     String label;
     
     switch (widget.recording.status) {
       case RecordingStatus.recording:
-        color = Colors.red;
+        color = theme.colorScheme.error;
         label = 'Recording';
         break;
       case RecordingStatus.uploading:
-        color = Colors.orange;
+        color = theme.colorScheme.tertiary;
         label = 'Uploading';
         break;
       case RecordingStatus.processing:
-        color = Colors.blue;
+        color = theme.colorScheme.primary;
         label = 'Processing';
         break;
       case RecordingStatus.completed:
-        color = Colors.green;
+        color = Colors.green; // Keep green for success
         label = 'Completed';
         break;
       case RecordingStatus.failed:
-        color = Colors.red;
+        color = theme.colorScheme.error;
         label = 'Failed';
         break;
     }
