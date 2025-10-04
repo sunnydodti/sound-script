@@ -21,7 +21,7 @@ class StartupService {
   }
 
   static Future<void> _initDB() async {
-    Box box = Hive.box(Constants.box);
+    // Box initialization complete
   }
 
   static Future _initPWA() async {

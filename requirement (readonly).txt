@@ -1,0 +1,62 @@
+Goal: Build a Flutter app that lets a user record audio and convert it to text.
+
+Requirements (must-have)
+• Record audio: Mic permission + record/stop UI, show duration.
+• Transcribe: Send audio to a speech-to-text API and display the transcript.
+• List & View: Home screen lists past recordings; detail screen shows audio player + transcript.
+• States/Errors: Show progress (upload/transcribe), and clear error messages.
+
+Bonus (nice to have)
+• Bonus: Live (streaming) transcription while recording.
+• Upload & store: Save audio (e.g., Firebase Storage) and keep a reference in a list.
+• Search/filter: Simple search over transcript text.
+• Edit & save: Inline transcript edits persisted.
+• Share/export: Copy transcript or export as .txt.
+
+
+
+Plan:
+1. Setup - complete
+2. Storage: use local storage (Hive) to save recordings and transcripts hive models not needed just use simple key-value pairs.
+3. StateManagement - Provider
+4. Navigation:
+   - Create a bottom navigation bar with 3 tabs: Home, Record, About.
+   - Use Provider for state management to track the current tab.
+   - Each tab should load a different page.
+5. pages:
+   - HomePage: Displays a list of past recordings.
+   - RecordPage: Contains the UI for recording audio.
+   - AboutPage: Provides information about the app & the creator with links.
+
+6. Home Page:
+   - Fetch and display a list of past recordings from local storage.
+   - Each item should show the recording name, date, and a play button.
+   - Tapping an item navigates to a detail view with the audio player and transcript.
+
+7. Record Page:
+   - User can record audio or select audio file (reasonable restrictions on file size and format).
+   - if recording:
+        - Request microphone permission.
+        - Start recording audio when user presses the record button.
+        - Show recording duration in real-time.
+        - show text to speech in realtime while recording. (future scope)
+        - Provide buttons to start and stop recording.
+        - once stopped user can update the name of the recording & and save it or discard it.
+        - update status on each step (enum)
+   
+   - if selecting file:
+        - request storage permission.
+        - Show file picker to select audio file.
+        - once selected user can send the file to the speech-to-text API for transcription.
+        - while sending show progress indicator. and update the status accordingly. (enum)
+
+8. Scope and TODOs:
+   - mock api calls to return dummy transcript.
+   - Implement audio recording using a suitable package (e.g., flutter_sound).
+   - Implement the above features step by step.
+   - Test each feature thoroughly before moving to the next.
+   - Ensure the app handles errors gracefully and provides clear feedback to the user. 
+
+Copilot Notes
+- do not prompt me to start modify the debugging session. User wants to continue coding.
+- Your task is to just code and not explain.

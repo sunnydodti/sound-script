@@ -5,6 +5,8 @@ import 'data/constants.dart';
 import 'data/provider/nav_provider.dart';
 import 'data/provider/theme_provider.dart';
 import 'pages/home_page.dart';
+import 'pages/record_page.dart';
+import 'pages/about_page.dart';
 import 'widgets/bottom_navbar.dart';
 import 'widgets/mobile_wrapper.dart';
 import 'widgets/my_appbar.dart';
@@ -27,8 +29,8 @@ class SoundScript extends StatelessWidget {
             index: navProvider.index,
             children: const [
               HomePage(),
-              Placeholder(),
-              Placeholder(),
+              RecordPage(),
+              AboutPage(),
             ],
           ),
           bottomNavigationBar: const BottomNavbar(),
