@@ -47,6 +47,12 @@ class _RecordPageState extends State<RecordPage> {
   void _startLiveListening() async {
     final recordingProvider = context.read<RecordingProvider>();
     
+    // Reset button state when starting new recording
+    setState(() {
+      _dismissedViewButton = true;
+      _completedRecording = null;
+    });
+    
     // Start audio recording
     final started = await recordingProvider.startLiveRecording();
     if (!started) {
@@ -62,7 +68,7 @@ class _RecordPageState extends State<RecordPage> {
     _liveSegments.clear();
     _liveTranscript = '';
     
-    // Start speech recognition
+    // Start speech recognition with continuous listening
     await _speechToText.listen(
       onResult: (result) {
         final now = DateTime.now();
@@ -71,20 +77,41 @@ class _RecordPageState extends State<RecordPage> {
         setState(() {
           _liveTranscript = result.recognizedWords;
           
-          // If this is a final result, save it as a segment
+          // If this is a final result, save it as word-level segments (like API format)
           if (result.finalResult && result.recognizedWords.isNotEmpty) {
-            // Estimate segment duration (500ms per segment as default)
-            final segmentDuration = 500;
-            final startMs = elapsedMs - segmentDuration;
+            // Split phrase into individual words
+            final words = result.recognizedWords.split(' ');
             
-            _liveSegments.add({
-              'text': result.recognizedWords,
-              'startTimeMs': startMs > 0 ? startMs : 0,
-              'endTimeMs': elapsedMs,
-            });
+            // Estimate total phrase duration (time since last segment or 1 second default)
+            final lastEndMs = _liveSegments.isNotEmpty 
+                ? _liveSegments.last['endTimeMs'] as int
+                : 0;
+            final phraseStartMs = lastEndMs;
+            final phraseDurationMs = elapsedMs - phraseStartMs;
+            
+            // Distribute time evenly across words
+            final msPerWord = words.isNotEmpty ? phraseDurationMs / words.length : 0;
+            
+            // Add each word as a separate segment (matching API format)
+            for (int i = 0; i < words.length; i++) {
+              final wordStartMs = (phraseStartMs + (i * msPerWord)).round();
+              final wordEndMs = (phraseStartMs + ((i + 1) * msPerWord)).round();
+              
+              _liveSegments.add({
+                'text': words[i],
+                'startTimeMs': wordStartMs,
+                'endTimeMs': wordEndMs > elapsedMs ? elapsedMs : wordEndMs,
+              });
+            }
           }
         });
       },
+      listenFor: const Duration(minutes: 5), // Maximum 5-minute listening sessions
+      pauseFor: const Duration(seconds: 5), // Wait 5 seconds after pause before finalizing
+      partialResults: true, // Show partial results immediately
+      onSoundLevelChange: null,
+      cancelOnError: true,
+      listenMode: stt.ListenMode.confirmation, // Continue listening after pauses
     );
     setState(() => _isListening = true);
   }
@@ -100,22 +127,150 @@ class _RecordPageState extends State<RecordPage> {
     setState(() => _isListening = false);
   }
   
-  void _saveLiveTranscription(BuildContext context) async {
-    if (_liveTranscript.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No transcription to save')),
-      );
-      return;
-    }
+  void _showTranscriptionOptions(BuildContext context) async {
+    final theme = Theme.of(context);
+    
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save Transcription'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Choose how to save your recording:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 24),
+            
+            // Option 1: Save as-is
+            InkWell(
+              onTap: () => Navigator.pop(context, 'save_as_is'),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outline),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.save_alt, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Save As-Is',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '• Uses live transcription (may be less accurate)\n'
+                      '• Instant save\n'
+                      '• Approximate word timestamps',
+                      style: TextStyle(fontSize: 13, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Option 2: Server transcription
+            InkWell(
+              onTap: () => Navigator.pop(context, 'server_transcribe'),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outline),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.cloud_upload, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Server Transcription',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '• High accuracy transcription\n'
+                      '• Precise word-level timestamps\n'
+                      '• Takes a few moments to process',
+                      style: TextStyle(fontSize: 13, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    
+    if (choice == null || !mounted) return;
     
     final recordingProvider = context.read<RecordingProvider>();
-    await recordingProvider.saveLiveTranscription(_liveTranscript, _liveSegments);
     
-    setState(() {
-      _liveTranscript = '';
-      _liveSegments.clear();
-      _liveStartTime = null;
-    });
+    if (choice == 'save_as_is') {
+      // Save with live transcription
+      await recordingProvider.saveLiveTranscription(_liveTranscript, _liveSegments);
+      
+      // Get the saved recording
+      if (recordingProvider.recordings.isNotEmpty) {
+        final savedRecording = recordingProvider.recordings.first;
+        
+        setState(() {
+          _liveTranscript = '';
+          _liveSegments.clear();
+          _liveStartTime = null;
+          _completedRecording = savedRecording;
+          _dismissedViewButton = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Recording saved with live transcription')),
+          );
+        }
+      }
+    } else if (choice == 'server_transcribe') {
+      // Save audio first, then transcribe on server
+      await recordingProvider.saveLiveRecordingForServerTranscription();
+      
+      // Clear live transcript state
+      setState(() {
+        _liveTranscript = '';
+        _liveSegments.clear();
+        _liveStartTime = null;
+      });
+      
+      // Get the saved recording and trigger transcription
+      if (recordingProvider.currentRecording != null) {
+        // Trigger server transcription (this will show the status updates)
+        await recordingProvider.transcribeCurrentRecording();
+        
+        // Note: Don't set _completedRecording here - let the status change handler
+        // in build() handle it when transcription completes, just like normal/file modes
+      }
+    }
   }
   
   @override
@@ -844,6 +999,21 @@ class _RecordPageState extends State<RecordPage> {
   Widget _buildLiveTranscriptionMode(ThemeData theme) {
     final recordingProvider = context.watch<RecordingProvider>();
     
+    // If user chose server transcription, show the recording complete UI with status updates
+    if (recordingProvider.currentRecording != null && 
+        recordingProvider.currentRecording!.filePath != null &&
+        _liveTranscript.isEmpty) {
+      final status = recordingProvider.currentRecording!.status;
+      final hasTranscript = recordingProvider.currentRecording!.transcript != null;
+      
+      if (status == RecordingStatus.uploading ||
+          status == RecordingStatus.processing ||
+          status == RecordingStatus.failed ||
+          (status == RecordingStatus.completed && (!hasTranscript || _showCompletedStatus))) {
+        return _buildRecordingCompleteUI(recordingProvider, theme);
+      }
+    }
+    
     return Center(
       child: Column(
         children: [
@@ -913,15 +1083,17 @@ class _RecordPageState extends State<RecordPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _saveLiveTranscription(context),
-              icon: const Icon(Icons.save),
-              label: const Text('Save Transcription'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            if (!_isListening) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => _showTranscriptionOptions(context),
+                icon: const Icon(Icons.save),
+                label: const Text('Save Transcription'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
               ),
-            ),
+            ],
           ]
           else
             Container(
@@ -943,6 +1115,49 @@ class _RecordPageState extends State<RecordPage> {
                 ],
               ),
             ),
+          
+          // View Transcription button (only show after saving, unless dismissed)
+          if (!_dismissedViewButton && _completedRecording != null) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Navigate to the saved live recording
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DetailsPage(recording: _completedRecording!),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.description),
+                    label: const Text('View Transcription'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _dismissedViewButton = true; // Dismiss the button
+                      _completedRecording = null; // Clear the completed recording reference
+                    });
+                  },
+                  icon: const Icon(Icons.close, size: 20),
+                  tooltip: 'Dismiss',
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

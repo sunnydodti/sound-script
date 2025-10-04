@@ -31,7 +31,13 @@ class RecordingProvider with ChangeNotifier {
   String _errorMessage = '';
   String _successMessage = '';
 
-  List<Recording> get recordings => List.unmodifiable(_recordings);
+  List<Recording> get recordings {
+    // Sort by creation date, newest first
+    final sorted = List<Recording>.from(_recordings);
+    sorted.sort((a, b) => b.created.compareTo(a.created));
+    return List.unmodifiable(sorted);
+  }
+  
   Recording? get currentRecording => _currentRecording;
   Duration get recordingDuration => _recordingDuration;
   bool get isRecording => _isRecording;
@@ -494,7 +500,7 @@ class RecordingProvider with ChangeNotifier {
     }
   }
   
-  // Save live transcription (with audio file)
+  // Save live transcription (with audio file) - for "Save As-Is" option
   Future<void> saveLiveTranscription(String transcript, List<Map<String, dynamic>> segments) async {
     try {
       if (_liveRecording == null) {
@@ -527,6 +533,37 @@ class RecordingProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _errorMessage = 'Failed to save transcription: $e';
+      notifyListeners();
+    }
+  }
+  
+  // Save live recording for server transcription - for "Server Transcription" option
+  Future<void> saveLiveRecordingForServerTranscription() async {
+    try {
+      if (_liveRecording == null) {
+        _errorMessage = 'No live recording found';
+        notifyListeners();
+        return;
+      }
+      
+      // Save the recording with basic info, no transcript yet
+      _liveRecording!
+        ..title = 'Live_${DateTime.now().toIso8601String().substring(0, 19).replaceAll(':', '-')}'
+        ..status = RecordingStatus.uploading // Will start transcription process
+        ..modified = DateTime.now();
+      
+      await addRecording(_liveRecording!);
+      
+      // Set as current recording for transcription
+      _currentRecording = _liveRecording;
+      
+      // Clear live recording reference
+      _liveRecording = null;
+      _recordingDuration = Duration.zero;
+      
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Failed to save recording: $e';
       notifyListeners();
     }
   }
