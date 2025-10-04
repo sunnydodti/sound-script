@@ -9,12 +9,24 @@ import '../data/provider/recording_provider.dart';
 
 class RecordingTile extends StatelessWidget {
   final Recording recording;
-  const RecordingTile({super.key, required this.recording});
+  final String searchQuery;
+  
+  const RecordingTile({
+    super.key, 
+    required this.recording,
+    this.searchQuery = '',
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final recordingProvider = Provider.of<RecordingProvider>(context, listen: false);
+    
+    // Check where the match is
+    final query = searchQuery.toLowerCase();
+    final titleMatches = query.isNotEmpty && recording.title.toLowerCase().contains(query);
+    final transcriptMatches = query.isNotEmpty && 
+        (recording.transcript?.toLowerCase().contains(query) ?? false);
     
     return Dismissible(
       key: Key(recording.id.toString()),
@@ -51,11 +63,13 @@ class RecordingTile extends StatelessWidget {
             color: theme.colorScheme.onPrimaryContainer,
           ),
         ),
-        title: Text(
-          recording.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: titleMatches
+            ? _buildHighlightedText(recording.title, query, theme)
+            : Text(
+                recording.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -67,6 +81,11 @@ class RecordingTile extends StatelessWidget {
               Text(
                 'Duration: ${_formatDuration(recording.duration)}',
                 style: theme.textTheme.bodySmall,
+              ),
+            if (transcriptMatches && !titleMatches)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: _buildTranscriptPreview(recording.transcript!, query, theme),
               ),
           ],
         ),
@@ -246,6 +265,123 @@ class RecordingTile extends StatelessWidget {
             child: const Text('Delete'),
           ),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildHighlightedText(String text, String query, ThemeData theme) {
+    if (query.isEmpty) {
+      return Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    final spans = <TextSpan>[];
+    int start = 0;
+    
+    while (true) {
+      final index = lowerText.indexOf(lowerQuery, start);
+      if (index == -1) {
+        // Add remaining text
+        if (start < text.length) {
+          spans.add(TextSpan(text: text.substring(start)));
+        }
+        break;
+      }
+      
+      // Add text before match
+      if (index > start) {
+        spans.add(TextSpan(text: text.substring(start, index)));
+      }
+      
+      // Add highlighted match
+      spans.add(TextSpan(
+        text: text.substring(index, index + query.length),
+        style: TextStyle(
+          backgroundColor: theme.colorScheme.primary.withOpacity(0.3),
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.onSurface,
+        ),
+      ));
+      
+      start = index + query.length;
+    }
+    
+    return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: theme.textTheme.bodyLarge,
+        children: spans,
+      ),
+    );
+  }
+  
+  Widget _buildTranscriptPreview(String transcript, String query, ThemeData theme) {
+    final lowerTranscript = transcript.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    final index = lowerTranscript.indexOf(lowerQuery);
+    
+    if (index == -1) return const SizedBox.shrink();
+    
+    // Extract context around the match (50 chars before and after)
+    final start = (index - 50).clamp(0, transcript.length);
+    final end = (index + query.length + 50).clamp(0, transcript.length);
+    
+    String preview = transcript.substring(start, end);
+    if (start > 0) preview = '...$preview';
+    if (end < transcript.length) preview = '$preview...';
+    
+    // Find the query position in the preview
+    final previewLower = preview.toLowerCase();
+    final queryIndex = previewLower.indexOf(lowerQuery);
+    
+    final spans = <TextSpan>[];
+    if (queryIndex != -1) {
+      // Text before match
+      if (queryIndex > 0) {
+        spans.add(TextSpan(text: preview.substring(0, queryIndex)));
+      }
+      
+      // Highlighted match
+      spans.add(TextSpan(
+        text: preview.substring(queryIndex, queryIndex + query.length),
+        style: TextStyle(
+          backgroundColor: theme.colorScheme.primary.withOpacity(0.3),
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.onSurface,
+        ),
+      ));
+      
+      // Text after match
+      if (queryIndex + query.length < preview.length) {
+        spans.add(TextSpan(
+          text: preview.substring(queryIndex + query.length),
+        ));
+      }
+    } else {
+      spans.add(TextSpan(text: preview));
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: RichText(
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        text: TextSpan(
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontStyle: FontStyle.italic,
+          ),
+          children: spans,
+        ),
       ),
     );
   }

@@ -14,6 +14,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -33,6 +40,7 @@ class _HomePageState extends State<HomePage> {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: TextField(
+            controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Search recordings...',
               prefixIcon: const Icon(Icons.search),
@@ -40,6 +48,7 @@ class _HomePageState extends State<HomePage> {
                   ? IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
+                        _searchController.clear();
                         setState(() {
                           _searchQuery = '';
                         });
@@ -91,7 +100,10 @@ class _HomePageState extends State<HomePage> {
                     itemCount: filteredRecordings.length,
                     itemBuilder: (context, index) {
                       Recording recording = filteredRecordings[index];
-                      return RecordingTile(recording: recording);
+                      return RecordingTile(
+                        recording: recording,
+                        searchQuery: _searchQuery,
+                      );
                     },
                   ),
                 ),
