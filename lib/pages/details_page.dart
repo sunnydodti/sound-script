@@ -12,6 +12,7 @@ import '../data/theme.dart';
 import '../models/recording.dart';
 import '../models/transcript_segment.dart';
 import '../service/audio_service.dart';
+import '../widgets/mobile_wrapper.dart';
 
 class DetailsPage extends StatefulWidget {
   final Recording recording;
@@ -109,401 +110,403 @@ class _DetailsPageState extends State<DetailsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recording Details'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _showEditTitleDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: _shareRecording,
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title and Status - Compact
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.recording.title,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+    return MobileWrapper(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Recording Details'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: _showEditTitleDialog,
+            ),
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: _shareRecording,
+            ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title and Status - Compact
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.recording.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 14,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDate(widget.recording.created),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.timer,
+                            size: 14,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDuration(widget.recording.duration),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildStatusChip(),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Show loading indicator while checking audio
+              if (_isCheckingAudio && widget.recording.filePath != null)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(
+                      child: CircularProgressIndicator(),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
+                  ),
+                ),
+              
+              // Web Warning - Show before player when audio is available
+              if (!_isCheckingAudio && _isAudioAvailable && kIsWeb && widget.recording.filePath != null)
+                Card(
+                  color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
                       children: [
                         Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatDate(widget.recording.created),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
-                          ),
+                          Icons.info_outline,
+                          color: theme.colorScheme.onSecondaryContainer,
+                          size: 24,
                         ),
                         const SizedBox(width: 12),
-                        Icon(
-                          Icons.timer,
-                          size: 14,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatDuration(widget.recording.duration),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
+                        Expanded(
+                          child: Text(
+                            'Note: Audio will not be available after page refresh due to browser restrictions. However, the transcript will remain available.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSecondaryContainer,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        _buildStatusChip(),
                       ],
                     ),
+                  ),
+                ),
+              
+              if (!_isCheckingAudio && _isAudioAvailable && kIsWeb && widget.recording.filePath != null)
+                const SizedBox(height: 8),
+              
+              // Audio Player - Show when available
+              if (!_isCheckingAudio && _isAudioAvailable && widget.recording.filePath != null)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Column(
+                      children: [
+                        // Playback controls - centered
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.replay_10),
+                              iconSize: 28,
+                              onPressed: _isInitialized ? _skipBackward : null,
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: Icon(
+                                _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                              ),
+                              iconSize: 56,
+                              onPressed: _isInitialized ? _togglePlayback : null,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.forward_10),
+                              iconSize: 28,
+                              onPressed: _isInitialized ? _skipForward : null,
+                            ),
+                          ],
+                        ),
+                        // Slider with time labels
+                        Row(
+                          children: [
+                            Text(
+                              _formatDuration(_currentPosition),
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            Expanded(
+                              child: Slider(
+                                value: _currentPosition.inMilliseconds.toDouble().clamp(
+                                  0.0,
+                                  _totalDuration.inMilliseconds.toDouble() > 0
+                                      ? _totalDuration.inMilliseconds.toDouble()
+                                      : 1.0,
+                                ),
+                                max: _totalDuration.inMilliseconds.toDouble() > 0
+                                    ? _totalDuration.inMilliseconds.toDouble()
+                                    : 1.0,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _currentPosition = Duration(milliseconds: value.toInt());
+                                  });
+                                },
+                                onChangeEnd: (value) {
+                                  _audioService.seekTo(Duration(milliseconds: value.toInt()));
+                                },
+                              ),
+                            ),
+                            Text(
+                              _formatDuration(_totalDuration),
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              // Audio Unavailable Warning - Show when not available
+              if (!_isCheckingAudio && !_isAudioAvailable && widget.recording.filePath != null)
+                Card(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 48,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Audio Playback Unavailable',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'The audio file is no longer available because the page was refreshed. The audio data was stored temporarily in browser memory and was lost on reload.\n\nThe transcript is still available below.',
+                          style: theme.textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              // Live Scrolling Words (only during playback)
+              if (_isPlaying && widget.recording.transcriptSegments.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: _buildLiveScrollingWords(theme),
+                ),
+              
+              const SizedBox(height: 12),
+              
+              // Transcript header - compact
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Transcript',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (widget.recording.transcript != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.copy),
+                            onPressed: _copyTranscriptText,
+                            tooltip: 'Copy Text',
+                          ),
+                          IconButton(
+                            icon: Icon(_isEditingTranscript ? Icons.check : Icons.edit),
+                            onPressed: () async {
+                          if (_isEditingTranscript) {
+                            // Get provider and find the recording
+                            final provider = context.read<RecordingProvider>();
+                            final recordings = provider.recordings;
+                            final index = recordings.indexWhere((r) => r.id == widget.recording.id);
+                            
+                            if (index != -1) {
+                              // Get the actual recording from provider
+                              final recording = recordings[index];
+                              
+                              // Update transcript from edited segments
+                              if (widget.recording.transcriptSegments.isNotEmpty) {
+                                recording.transcript = widget.recording.transcriptSegments
+                                    .map((s) => s.text)
+                                    .join(' ');
+                                recording.transcriptSegments = widget.recording.transcriptSegments;
+                              } else {
+                                recording.transcript = _transcriptController.text;
+                              }
+                              
+                              recording.modified = DateTime.now();
+                              
+                              // Update in storage
+                              await provider.updateRecording(index, recording);
+                              
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Transcript updated successfully'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                          
+                          setState(() {
+                            _isEditingTranscript = !_isEditingTranscript;
+                          });
+                        },
+                        tooltip: _isEditingTranscript ? 'Save' : 'Edit',
+                      ),
+                        ],
+                      ),
                   ],
                 ),
               ),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Show loading indicator while checking audio
-            if (_isCheckingAudio && widget.recording.filePath != null)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-              ),
-            
-            // Web Warning - Show before player when audio is available
-            if (!_isCheckingAudio && _isAudioAvailable && kIsWeb && widget.recording.filePath != null)
-              Card(
-                color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: theme.colorScheme.onSecondaryContainer,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Note: Audio will not be available after page refresh due to browser restrictions. However, the transcript will remain available.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSecondaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            
-            if (!_isCheckingAudio && _isAudioAvailable && kIsWeb && widget.recording.filePath != null)
-              const SizedBox(height: 8),
-            
-            // Audio Player - Show when available
-            if (!_isCheckingAudio && _isAudioAvailable && widget.recording.filePath != null)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Column(
-                    children: [
-                      // Playback controls - centered
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.replay_10),
-                            iconSize: 28,
-                            onPressed: _isInitialized ? _skipBackward : null,
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: Icon(
-                              _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                            ),
-                            iconSize: 56,
-                            onPressed: _isInitialized ? _togglePlayback : null,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.forward_10),
-                            iconSize: 28,
-                            onPressed: _isInitialized ? _skipForward : null,
-                          ),
-                        ],
-                      ),
-                      // Slider with time labels
-                      Row(
-                        children: [
-                          Text(
-                            _formatDuration(_currentPosition),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          Expanded(
-                            child: Slider(
-                              value: _currentPosition.inMilliseconds.toDouble().clamp(
-                                0.0,
-                                _totalDuration.inMilliseconds.toDouble() > 0
-                                    ? _totalDuration.inMilliseconds.toDouble()
-                                    : 1.0,
-                              ),
-                              max: _totalDuration.inMilliseconds.toDouble() > 0
-                                  ? _totalDuration.inMilliseconds.toDouble()
-                                  : 1.0,
-                              onChanged: (value) {
-                                setState(() {
-                                  _currentPosition = Duration(milliseconds: value.toInt());
-                                });
-                              },
-                              onChangeEnd: (value) {
-                                _audioService.seekTo(Duration(milliseconds: value.toInt()));
-                              },
-                            ),
-                          ),
-                          Text(
-                            _formatDuration(_totalDuration),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            
-            // Audio Unavailable Warning - Show when not available
-            if (!_isCheckingAudio && !_isAudioAvailable && widget.recording.filePath != null)
-              Card(
-                color: theme.colorScheme.surfaceContainerLow,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 48,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Audio Playback Unavailable',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'The audio file is no longer available because the page was refreshed. The audio data was stored temporarily in browser memory and was lost on reload.\n\nThe transcript is still available below.',
-                        style: theme.textTheme.bodySmall,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            
-            // Live Scrolling Words (only during playback)
-            if (_isPlaying && widget.recording.transcriptSegments.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: _buildLiveScrollingWords(theme),
-              ),
-            
-            const SizedBox(height: 12),
-            
-            // Transcript header - compact
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Transcript',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (widget.recording.transcript != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.copy),
-                          onPressed: _copyTranscriptText,
-                          tooltip: 'Copy Text',
-                        ),
-                        IconButton(
-                          icon: Icon(_isEditingTranscript ? Icons.check : Icons.edit),
-                          onPressed: () async {
-                        if (_isEditingTranscript) {
-                          // Get provider and find the recording
-                          final provider = context.read<RecordingProvider>();
-                          final recordings = provider.recordings;
-                          final index = recordings.indexWhere((r) => r.id == widget.recording.id);
-                          
-                          if (index != -1) {
-                            // Get the actual recording from provider
-                            final recording = recordings[index];
-                            
-                            // Update transcript from edited segments
-                            if (widget.recording.transcriptSegments.isNotEmpty) {
-                              recording.transcript = widget.recording.transcriptSegments
-                                  .map((s) => s.text)
-                                  .join(' ');
-                              recording.transcriptSegments = widget.recording.transcriptSegments;
-                            } else {
-                              recording.transcript = _transcriptController.text;
-                            }
-                            
-                            recording.modified = DateTime.now();
-                            
-                            // Update in storage
-                            await provider.updateRecording(index, recording);
-                            
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Transcript updated successfully'),
-                                  duration: Duration(seconds: 2),
+              const SizedBox(height: 4),
+              
+              // Full Transcript
+              if (widget.recording.transcript != null)
+                _isEditingTranscript
+                    ? Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                              );
-                            }
-                          }
-                        }
-                        
-                        setState(() {
-                          _isEditingTranscript = !_isEditingTranscript;
-                        });
-                      },
-                      tooltip: _isEditingTranscript ? 'Save' : 'Edit',
-                    ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            
-            // Full Transcript
-            if (widget.recording.transcript != null)
-              _isEditingTranscript
-                  ? Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    size: 16,
-                                    color: theme.colorScheme.onPrimaryContainer,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Edit individual words. Timestamps are preserved.',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.onPrimaryContainer,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 16,
+                                      color: theme.colorScheme.onPrimaryContainer,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Edit individual words. Timestamps are preserved.',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onPrimaryContainer,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            if (widget.recording.transcriptSegments.isNotEmpty)
-                              _buildEditableSegments(theme)
-                            else
-                              TextField(
-                                controller: _transcriptController,
-                                maxLines: null,
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: 'Edit transcript...',
+                                  ],
                                 ),
+                              ),
+                              const SizedBox(height: 16),
+                              if (widget.recording.transcriptSegments.isNotEmpty)
+                                _buildEditableSegments(theme)
+                              else
+                                TextField(
+                                  controller: _transcriptController,
+                                  maxLines: null,
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: 'Edit transcript...',
+                                  ),
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : widget.recording.transcriptSegments.isNotEmpty
+                        ? _buildFullTranscript(theme)
+                        : Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: SelectableText(
+                                widget.recording.transcript!,
                                 style: theme.textTheme.bodyMedium,
                               ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : widget.recording.transcriptSegments.isNotEmpty
-                      ? _buildFullTranscript(theme)
-                      : Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: SelectableText(
-                              widget.recording.transcript!,
-                              style: theme.textTheme.bodyMedium,
                             ),
-                          ),
-                        )
-            else if (widget.recording.status == RecordingStatus.processing)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Transcribing audio...'),
-                      ],
+                          )
+              else if (widget.recording.status == RecordingStatus.processing)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('Transcribing audio...'),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No transcript available',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ),
-              )
-            else
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'No transcript available',
-                    style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
