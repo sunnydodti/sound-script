@@ -27,6 +27,8 @@ class _DetailsPageState extends State<DetailsPage> {
   bool _isPlaying = false;
   bool _isInitialized = false;
   bool _isEditingTranscript = false;
+  bool _isAudioAvailable = true; // Assume available until proven otherwise
+  bool _isCheckingAudio = true; // Loading state
   late TextEditingController _transcriptController;
   
   // Playback progress
@@ -37,11 +39,10 @@ class _DetailsPageState extends State<DetailsPage> {
   @override
   void initState() {
     super.initState();
-    _initPlayer();
+    _checkAudioAvailability();
     _transcriptController = TextEditingController(
       text: widget.recording.transcript ?? '',
     );
-    _loadAudioMetadata();
     
     // Debug: Print segment info
     print('Total segments: ${widget.recording.transcriptSegments.length}');
@@ -51,26 +52,45 @@ class _DetailsPageState extends State<DetailsPage> {
     }
   }
   
-  Future<void> _initPlayer() async {
-    await _audioService.initPlayer();
-    setState(() {
-      _isInitialized = true;
-    });
-  }
-  
-  Future<void> _loadAudioMetadata() async {
-    if (widget.recording.filePath != null) {
+  Future<void> _checkAudioAvailability() async {
+    if (widget.recording.filePath == null) {
+      setState(() {
+        _isAudioAvailable = false;
+        _isCheckingAudio = false;
+      });
+      return;
+    }
+    
+    try {
+      // Try to initialize player and load the audio
+      await _audioService.initPlayer();
+      
+      // Try to get audio duration - if this fails, audio is not available
       final duration = await _audioService.getAudioDuration(widget.recording.filePath!);
+      
       if (duration != null) {
+        // Audio is available
         setState(() {
+          _isAudioAvailable = true;
+          _isInitialized = true;
           _totalDuration = duration;
+          _isCheckingAudio = false;
         });
       } else {
-        // Fallback to recorded duration
+        // Could not load audio, fallback to recorded duration
         setState(() {
+          _isAudioAvailable = false;
           _totalDuration = widget.recording.duration;
+          _isCheckingAudio = false;
         });
       }
+    } catch (e) {
+      print('Error checking audio availability: $e');
+      setState(() {
+        _isAudioAvailable = false;
+        _totalDuration = widget.recording.duration;
+        _isCheckingAudio = false;
+      });
     }
   }
   
@@ -162,8 +182,49 @@ class _DetailsPageState extends State<DetailsPage> {
             
             const SizedBox(height: 12),
             
-            // Audio Player - Compact
-            if (widget.recording.filePath != null)
+            // Show loading indicator while checking audio
+            if (_isCheckingAudio && widget.recording.filePath != null)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              ),
+            
+            // Web Warning - Show before player when audio is available
+            if (!_isCheckingAudio && _isAudioAvailable && kIsWeb && widget.recording.filePath != null)
+              Card(
+                color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: theme.colorScheme.onSecondaryContainer,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Note: Audio will not be available after page refresh due to browser restrictions. However, the transcript will remain available.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            
+            if (!_isCheckingAudio && _isAudioAvailable && kIsWeb && widget.recording.filePath != null)
+              const SizedBox(height: 8),
+            
+            // Audio Player - Show when available
+            if (!_isCheckingAudio && _isAudioAvailable && widget.recording.filePath != null)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -228,6 +289,37 @@ class _DetailsPageState extends State<DetailsPage> {
                             style: theme.textTheme.bodySmall,
                           ),
                         ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            
+            // Audio Unavailable Warning - Show when not available
+            if (!_isCheckingAudio && !_isAudioAvailable && widget.recording.filePath != null)
+              Card(
+                color: theme.colorScheme.surfaceContainerLow,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 48,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Audio Playback Unavailable',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'The audio file is no longer available because the page was refreshed. The audio data was stored temporarily in browser memory and was lost on reload.\n\nThe transcript is still available below.',
+                        style: theme.textTheme.bodySmall,
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -826,7 +918,7 @@ class _DetailsPageState extends State<DetailsPage> {
       }
     }
   }
-  
+
   String _formatTimestamp(int milliseconds) {
     final duration = Duration(milliseconds: milliseconds);
     final minutes = duration.inMinutes;

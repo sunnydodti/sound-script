@@ -179,6 +179,7 @@ class RecordingProvider with ChangeNotifier {
         return;
       }
       
+      // Store the path directly (blob URL on web, file path on mobile)
       _currentRecording!.filePath = path;
       _currentRecording!.duration = _recordingDuration;
       _currentRecording!.status = RecordingStatus.completed;
@@ -276,7 +277,7 @@ class RecordingProvider with ChangeNotifier {
         List<int>? webBytes;
         
         if (kIsWeb) {
-          // Web: Get file bytes and create blob URL
+          // Web: Create blob URL from file bytes
           final bytes = result.files.single.bytes;
           if (bytes == null) {
             _errorMessage = 'Unable to read file bytes';
@@ -286,9 +287,10 @@ class RecordingProvider with ChangeNotifier {
           
           webBytes = bytes;
           
-          // Create blob URL for playback on web
+          // Create blob URL (temporary, will not persist after refresh)
           final blob = html.Blob([Uint8List.fromList(bytes)]);
           filePath = html.Url.createObjectUrlFromBlob(blob);
+          print('Created blob URL for picked file');
           
           // For web, we'll estimate duration or set a default
           duration = Duration.zero;
@@ -343,8 +345,8 @@ class RecordingProvider with ChangeNotifier {
       _isProcessing = true;
       notifyListeners();
       
-      // Get cached bytes for web uploads
-      final bytes = kIsWeb ? _webFileBytes[recording.id] : null;
+      // Get cached bytes for web uploads (only from picked files)
+      List<int>? bytes = kIsWeb ? _webFileBytes[recording.id] : null;
       
       // Get transcript result from service with status callbacks
       final result = await _transcriptionService.transcribeAudio(
