@@ -1,16 +1,39 @@
-# soundscript
+# SoundScript
 
-A new Flutter project.
+Flutter app for audio recording and transcription.
 
-## Getting Started
+## Setup
 
-This project is a starting point for a Flutter application.
+### 1. Install Dependencies
+```bash
+flutter pub get
+```
 
-A few resources to get you started if this is your first Flutter project:
+### 2. Configure API Key
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+**IMPORTANT:** Before building/running the app, you must add your AssemblyAI API key.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. Copy the example config file:
+   ```bash
+   copy lib\data\api_config.example.dart lib\data\api_config.dart
+   ```
+
+2. Open `lib/data/api_config.dart` and replace `YOUR_ASSEMBLYAI_API_KEY_HERE` with your actual API key:
+   ```dart
+   class ApiConfig {
+     static const String assemblyAiApiKey = 'your_actual_api_key_here';
+     static const String assemblyAiBaseUrl = 'https://api.assemblyai.com/v2';
+   }
+   ```
+
+3. Get your API key from: https://www.assemblyai.com/
+
+### 3. Run the App
+```bash
+flutter run
+```
+
+## Security Notes
+- `lib/data/api_config.dart` is git-ignored for security
+- Never commit your API key to version control
+- The example file (`api_config.example.dart`) shows the structure without exposing your key

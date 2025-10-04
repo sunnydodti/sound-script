@@ -7,7 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import '../../models/recording.dart';
 import '../../models/transcript_segment.dart';
 import '../../service/audio_service.dart';
-import '../../service/transcription_service.dart';
+import '../../service/transcription_service_interface.dart';
+import '../../service/transcription_service_factory.dart';
 import '../constants.dart';
 
 class RecordingProvider with ChangeNotifier {
@@ -16,7 +17,7 @@ class RecordingProvider with ChangeNotifier {
   }
 
   final AudioService _audioService = AudioService();
-  final TranscriptionService _transcriptionService = TranscriptionService();
+  final TranscriptionService _transcriptionService = TranscriptionServiceFactory.getService();
   
   final List<Recording> _recordings = [];
   Recording? _currentRecording;
@@ -248,15 +249,27 @@ class RecordingProvider with ChangeNotifier {
       recording.status = RecordingStatus.processing;
       notifyListeners();
       
-      // Get transcript from service
-      final transcript = await _transcriptionService.transcribeAudio(recording.filePath ?? '');
+      // Get transcript result from service
+      final result = await _transcriptionService.transcribeAudio(
+        recording.filePath ?? '',
+        onStatusUpdate: (status, message) {
+          print('Transcription status: $status - $message');
+        },
+      );
       
-      recording.transcript = transcript;
+      // Extract transcript text
+      final transcriptText = _transcriptionService.extractTranscriptText(result);
+      recording.transcript = transcriptText;
       
-      // Generate mock timestamps for synchronized playback
-      // Split transcript into words and distribute evenly across duration
-      if (transcript.isNotEmpty && recording.duration.inMilliseconds > 0) {
-        final words = transcript.split(' ');
+      // Try to get word-level timestamps from API
+      final segments = _transcriptionService.extractTranscriptSegments(result);
+      
+      if (segments.isNotEmpty) {
+        // Use API-provided timestamps
+        recording.transcriptSegments = segments;
+      } else if (transcriptText.isNotEmpty && recording.duration.inMilliseconds > 0) {
+        // Fallback: Generate evenly distributed timestamps
+        final words = transcriptText.split(' ');
         final totalDurationMs = recording.duration.inMilliseconds;
         final msPerWord = totalDurationMs / words.length;
         

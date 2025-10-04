@@ -64,3 +64,12 @@ Copilot Notes
 
 New Scope:
    - option to delete a recording.
+
+Api : Assembly ai
+documentation:
+
+Overview: https://www.assemblyai.com/docs/api-reference/overview
+Upload file: https://www.assemblyai.com/docs/api-reference/files/upload
+Transcribe: https://www.assemblyai.com/docs/api-reference/transcripts/submit
+get transcript: https://www.assemblyai.com/docs/api-reference/transcripts/get
+
