@@ -5,6 +5,7 @@ import 'package:hive_ce/hive.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../../models/recording.dart';
+import '../../models/transcript_segment.dart';
 import '../../service/audio_service.dart';
 import '../../service/transcription_service.dart';
 import '../constants.dart';
@@ -19,6 +20,7 @@ class RecordingProvider with ChangeNotifier {
   
   final List<Recording> _recordings = [];
   Recording? _currentRecording;
+  Recording? _liveRecording; // For live transcription mode
   Duration _recordingDuration = Duration.zero;
   Timer? _durationTimer;
   StreamSubscription? _recordingSubscription;
@@ -250,6 +252,33 @@ class RecordingProvider with ChangeNotifier {
       final transcript = await _transcriptionService.transcribeAudio(recording.filePath ?? '');
       
       recording.transcript = transcript;
+      
+      // Generate mock timestamps for synchronized playback
+      // Split transcript into words and distribute evenly across duration
+      if (transcript.isNotEmpty && recording.duration.inMilliseconds > 0) {
+        final words = transcript.split(' ');
+        final totalDurationMs = recording.duration.inMilliseconds;
+        final msPerWord = totalDurationMs / words.length;
+        
+        recording.transcriptSegments = [];
+        int currentTimeMs = 0;
+        
+        for (final word in words) {
+          final startMs = currentTimeMs;
+          final endMs = (currentTimeMs + msPerWord).round();
+          
+          recording.transcriptSegments.add(
+            TranscriptSegment(
+              text: word,
+              startTimeMs: startMs,
+              endTimeMs: endMs > totalDurationMs ? totalDurationMs : endMs,
+            ),
+          );
+          
+          currentTimeMs = endMs;
+        }
+      }
+      
       recording.status = RecordingStatus.completed;
       recording.modified = DateTime.now();
       
@@ -315,6 +344,111 @@ class RecordingProvider with ChangeNotifier {
   void clearSuccess() {
     _successMessage = '';
     notifyListeners();
+  }
+  
+  // Start live recording (with audio)
+  Future<bool> startLiveRecording() async {
+    try {
+      _errorMessage = '';
+      
+      // Check and request permission
+      if (!await _audioService.hasPermission()) {
+        final granted = await _audioService.requestPermission();
+        if (!granted) {
+          _errorMessage = 'Microphone permission denied';
+          notifyListeners();
+          return false;
+        }
+      }
+      
+      // Start recording
+      final path = await _audioService.startRecording();
+      if (path == null) {
+        _errorMessage = 'Failed to start recording';
+        notifyListeners();
+        return false;
+      }
+      
+      // Create new recording object for live mode
+      _liveRecording = Recording()
+        ..filePath = path
+        ..status = RecordingStatus.recording
+        ..created = DateTime.now();
+      
+      _isRecording = true;
+      _recordingDuration = Duration.zero;
+      
+      // Start duration timer
+      _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        _recordingDuration += const Duration(seconds: 1);
+        notifyListeners();
+      });
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Error starting live recording: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Stop live recording
+  Future<void> stopLiveRecording() async {
+    try {
+      _durationTimer?.cancel();
+      
+      final path = await _audioService.stopRecording();
+      
+      if (_liveRecording != null && path != null) {
+        _liveRecording!.filePath = path;
+        _liveRecording!.duration = _recordingDuration;
+      }
+      
+      _isRecording = false;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Error stopping live recording: $e';
+      _isRecording = false;
+      notifyListeners();
+    }
+  }
+  
+  // Save live transcription (with audio file)
+  Future<void> saveLiveTranscription(String transcript, List<Map<String, dynamic>> segments) async {
+    try {
+      if (_liveRecording == null) {
+        _errorMessage = 'No live recording found';
+        notifyListeners();
+        return;
+      }
+      
+      // Update the live recording with transcript data
+      _liveRecording!
+        ..title = 'Live_${DateTime.now().toIso8601String().substring(0, 19).replaceAll(':', '-')}'
+        ..transcript = transcript
+        ..transcriptSegments = segments.map((seg) => TranscriptSegment.fromMap(seg)).toList()
+        ..status = RecordingStatus.completed
+        ..modified = DateTime.now();
+      
+      await addRecording(_liveRecording!);
+      _successMessage = 'Live transcription saved with audio!';
+      
+      // Clear live recording reference
+      _liveRecording = null;
+      _recordingDuration = Duration.zero;
+      
+      // Clear success message after 3 seconds
+      Timer(const Duration(seconds: 3), () {
+        _successMessage = '';
+        notifyListeners();
+      });
+      
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Failed to save transcription: $e';
+      notifyListeners();
+    }
   }
   
   @override

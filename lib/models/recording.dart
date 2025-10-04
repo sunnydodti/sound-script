@@ -1,3 +1,5 @@
+import 'transcript_segment.dart';
+
 class Recording {
 
   int id = DateTime.now().millisecondsSinceEpoch;
@@ -5,6 +7,7 @@ class Recording {
   String title = 'Recording_${DateTime.now().toIso8601String()}';
   String? filePath;
   String? transcript;
+  List<TranscriptSegment> transcriptSegments = []; // Timestamped segments
   Duration duration = Duration.zero;
   
   DateTime created = DateTime.now();
@@ -21,6 +24,7 @@ class Recording {
       'title': title,
       if (filePath != null)  'filePath': filePath,
       if (transcript != null)  'transcript': transcript,
+      'transcriptSegments': transcriptSegments.map((seg) => seg.toMap()).toList(),
       'duration': duration.inMilliseconds,
       'created': created.toIso8601String(),
       'modified': modified.toIso8601String(),
@@ -33,6 +37,9 @@ class Recording {
     title = map['title'] ?? 'Recording_${DateTime.now().toIso8601String()}';
     filePath = map['filePath'];
     transcript = map['transcript'];
+    transcriptSegments = (map['transcriptSegments'] as List?)
+        ?.map((item) => TranscriptSegment.fromMap(Map<String, dynamic>.from(item)))
+        .toList() ?? [];
     duration = Duration(milliseconds: map['duration'] ?? 0);
     created = DateTime.parse(map['created']);
     modified = DateTime.parse(map['modified']);

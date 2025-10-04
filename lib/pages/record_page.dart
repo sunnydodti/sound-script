@@ -23,6 +23,8 @@ class _RecordPageState extends State<RecordPage> {
   bool _speechEnabled = false;
   String _liveTranscript = '';
   bool _isListening = false;
+  List<Map<String, dynamic>> _liveSegments = []; // Store segments with timestamps
+  DateTime? _liveStartTime;
   
   @override
   void initState() {
@@ -37,10 +39,44 @@ class _RecordPageState extends State<RecordPage> {
   }
   
   void _startLiveListening() async {
+    final recordingProvider = context.read<RecordingProvider>();
+    
+    // Start audio recording
+    final started = await recordingProvider.startLiveRecording();
+    if (!started) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to start audio recording')),
+        );
+      }
+      return;
+    }
+    
+    _liveStartTime = DateTime.now();
+    _liveSegments.clear();
+    _liveTranscript = '';
+    
+    // Start speech recognition
     await _speechToText.listen(
       onResult: (result) {
+        final now = DateTime.now();
+        final elapsedMs = now.difference(_liveStartTime!).inMilliseconds;
+        
         setState(() {
           _liveTranscript = result.recognizedWords;
+          
+          // If this is a final result, save it as a segment
+          if (result.finalResult && result.recognizedWords.isNotEmpty) {
+            // Estimate segment duration (500ms per segment as default)
+            final segmentDuration = 500;
+            final startMs = elapsedMs - segmentDuration;
+            
+            _liveSegments.add({
+              'text': result.recognizedWords,
+              'startTimeMs': startMs > 0 ? startMs : 0,
+              'endTimeMs': elapsedMs,
+            });
+          }
         });
       },
     );
@@ -48,8 +84,32 @@ class _RecordPageState extends State<RecordPage> {
   }
   
   void _stopLiveListening() async {
+    final recordingProvider = context.read<RecordingProvider>();
+    
+    // Stop audio recording
+    await recordingProvider.stopLiveRecording();
+    
+    // Stop speech recognition
     await _speechToText.stop();
     setState(() => _isListening = false);
+  }
+  
+  void _saveLiveTranscription(BuildContext context) async {
+    if (_liveTranscript.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No transcription to save')),
+      );
+      return;
+    }
+    
+    final recordingProvider = context.read<RecordingProvider>();
+    await recordingProvider.saveLiveTranscription(_liveTranscript, _liveSegments);
+    
+    setState(() {
+      _liveTranscript = '';
+      _liveSegments.clear();
+      _liveStartTime = null;
+    });
   }
   
   @override
@@ -330,6 +390,8 @@ class _RecordPageState extends State<RecordPage> {
   }
   
   Widget _buildLiveTranscriptionMode(ThemeData theme) {
+    final recordingProvider = context.watch<RecordingProvider>();
+    
     return Center(
       child: Column(
         children: [
@@ -340,9 +402,19 @@ class _RecordPageState extends State<RecordPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            _isListening ? 'Listening...' : 'Ready for Live Transcription',
+            _isListening ? 'Recording & Listening...' : 'Ready for Live Transcription',
             style: theme.textTheme.headlineSmall,
           ),
+          if (_isListening && recordingProvider.isRecording) ...[
+            const SizedBox(height: 16),
+            Text(
+              _formatDuration(recordingProvider.recordingDuration),
+              style: theme.textTheme.displayMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: recordingColor,
+              ),
+            ),
+          ],
           const SizedBox(height: 48),
           ElevatedButton.icon(
             onPressed: _speechEnabled 
@@ -357,7 +429,7 @@ class _RecordPageState extends State<RecordPage> {
             ),
           ),
           const SizedBox(height: 32),
-          if (_liveTranscript.isNotEmpty)
+          if (_liveTranscript.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -388,7 +460,17 @@ class _RecordPageState extends State<RecordPage> {
                   ),
                 ],
               ),
-            )
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _saveLiveTranscription(context),
+              icon: const Icon(Icons.save),
+              label: const Text('Save Transcription'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ]
           else
             Container(
               padding: const EdgeInsets.all(16),
@@ -402,7 +484,7 @@ class _RecordPageState extends State<RecordPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Speak to see real-time transcription. No recording saved.',
+                      'Real-time transcription with audio recording. Play back with synchronized text!',
                       style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontSize: 12),
                     ),
                   ),

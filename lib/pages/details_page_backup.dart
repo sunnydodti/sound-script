@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -23,12 +22,6 @@ class _DetailsPageState extends State<DetailsPage> {
   bool _isEditingTranscript = false;
   late TextEditingController _transcriptController;
   
-  // Playback progress
-  Duration _currentPosition = Duration.zero;
-  Duration _totalDuration = Duration.zero;
-  final ScrollController _transcriptScrollController = ScrollController();
-  StreamSubscription<Duration>? _positionSubscription;
-  
   @override
   void initState() {
     super.initState();
@@ -36,14 +29,6 @@ class _DetailsPageState extends State<DetailsPage> {
     _transcriptController = TextEditingController(
       text: widget.recording.transcript ?? '',
     );
-    _totalDuration = widget.recording.duration;
-    
-    // Debug: Print segment info
-    print('Total segments: ${widget.recording.transcriptSegments.length}');
-    if (widget.recording.transcriptSegments.isNotEmpty) {
-      print('First segment: ${widget.recording.transcriptSegments.first.text} (${widget.recording.transcriptSegments.first.startTimeMs}-${widget.recording.transcriptSegments.first.endTimeMs}ms)');
-      print('Last segment: ${widget.recording.transcriptSegments.last.text} (${widget.recording.transcriptSegments.last.startTimeMs}-${widget.recording.transcriptSegments.last.endTimeMs}ms)');
-    }
   }
   
   Future<void> _initPlayer() async {
@@ -53,39 +38,11 @@ class _DetailsPageState extends State<DetailsPage> {
     });
   }
   
-  void _syncTranscriptScroll() {
-    if (widget.recording.transcriptSegments.isEmpty) return;
-    
-    // Find current active segment and scroll to it
-    final currentMs = _currentPosition.inMilliseconds;
-    int activeIndex = -1;
-    
-    for (int i = 0; i < widget.recording.transcriptSegments.length; i++) {
-      final segment = widget.recording.transcriptSegments[i];
-      if (currentMs >= segment.startTimeMs && currentMs <= segment.endTimeMs) {
-        activeIndex = i;
-        break;
-      }
-    }
-    
-    // Auto-scroll to active segment
-    if (activeIndex >= 0 && _transcriptScrollController.hasClients) {
-      final scrollOffset = activeIndex * 100.0; // Approximate segment width
-      _transcriptScrollController.animateTo(
-        scrollOffset,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-  
   @override
   void dispose() {
-    _positionSubscription?.cancel();
     _audioService.stopPlayback();
     _audioService.dispose();
     _transcriptController.dispose();
-    _transcriptScrollController.dispose();
     super.dispose();
   }
 
@@ -148,71 +105,34 @@ class _DetailsPageState extends State<DetailsPage> {
             
             const SizedBox(height: 16),
             
-            // Audio Player with Interactive Slider
+            // Audio Player
             if (widget.recording.filePath != null)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      // Time labels
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDuration(_currentPosition),
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                          Text(
-                            _formatDuration(_totalDuration),
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ],
+                      Icon(
+                        _isPlaying ? Icons.pause_circle : Icons.play_circle,
+                        size: 64,
+                        color: theme.colorScheme.primary,
                       ),
-                      // Interactive Slider
-                      Slider(
-                        value: _currentPosition.inMilliseconds.toDouble().clamp(
-                          0.0,
-                          _totalDuration.inMilliseconds.toDouble() > 0
-                              ? _totalDuration.inMilliseconds.toDouble()
-                              : 1.0,
-                        ),
-                        max: _totalDuration.inMilliseconds.toDouble() > 0
-                            ? _totalDuration.inMilliseconds.toDouble()
-                            : 1.0,
-                        onChanged: (value) {
-                          setState(() {
-                            _currentPosition = Duration(milliseconds: value.toInt());
-                          });
-                        },
-                        onChangeEnd: (value) {
-                          _audioService.seekTo(Duration(milliseconds: value.toInt()));
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      // Playback controls
+                      const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.replay_10),
-                            iconSize: 32,
-                            onPressed: _isInitialized ? _skipBackward : null,
-                          ),
-                          const SizedBox(width: 16),
-                          IconButton(
                             icon: Icon(
-                              _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                              _isPlaying ? Icons.pause : Icons.play_arrow,
                             ),
-                            iconSize: 64,
+                            iconSize: 48,
                             onPressed: _isInitialized ? _togglePlayback : null,
-                            color: theme.colorScheme.primary,
                           ),
                           const SizedBox(width: 16),
                           IconButton(
-                            icon: const Icon(Icons.forward_10),
-                            iconSize: 32,
-                            onPressed: _isInitialized ? _skipForward : null,
+                            icon: const Icon(Icons.stop),
+                            iconSize: 48,
+                            onPressed: _isInitialized && _isPlaying ? _stopPlayback : null,
                           ),
                         ],
                       ),
@@ -265,12 +185,10 @@ class _DetailsPageState extends State<DetailsPage> {
                             ),
                             style: theme.textTheme.bodyLarge,
                           )
-                        : widget.recording.transcriptSegments.isNotEmpty
-                            ? _buildSynchronizedTranscript(theme)
-                            : SelectableText(
-                                widget.recording.transcript!,
-                                style: theme.textTheme.bodyLarge,
-                              )
+                        : SelectableText(
+                            widget.recording.transcript!,
+                            style: theme.textTheme.bodyLarge,
+                          )
                     : widget.recording.status == RecordingStatus.processing
                         ? const Center(
                             child: Column(
@@ -291,36 +209,6 @@ class _DetailsPageState extends State<DetailsPage> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildSynchronizedTranscript(ThemeData theme) {
-    final currentMs = _currentPosition.inMilliseconds;
-    
-    return SizedBox(
-      height: 120,
-      child: SingleChildScrollView(
-        controller: _transcriptScrollController,
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: widget.recording.transcriptSegments.asMap().entries.map((entry) {
-            final segment = entry.value;
-            final isActive = currentMs >= segment.startTimeMs && currentMs <= segment.endTimeMs;
-            
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                segment.text,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.5),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  fontSize: isActive ? 24 : 18,
-                ),
-              ),
-            );
-          }).toList(),
         ),
       ),
     );
@@ -367,72 +255,26 @@ class _DetailsPageState extends State<DetailsPage> {
   Future<void> _togglePlayback() async {
     if (_isPlaying) {
       await _audioService.pausePlayback();
-      _positionSubscription?.cancel();
       setState(() {
         _isPlaying = false;
       });
     } else {
       if (widget.recording.filePath != null) {
-        final success = await _audioService.playAudio(
-          widget.recording.filePath!,
-          whenFinished: () {
-            if (mounted) {
-              setState(() {
-                _isPlaying = false;
-                _currentPosition = Duration.zero;
-              });
-              _positionSubscription?.cancel();
-            }
-          },
-        );
+        final success = await _audioService.playAudio(widget.recording.filePath!);
         if (success) {
           setState(() {
             _isPlaying = true;
           });
-          
-          // Cancel any existing subscription
-          await _positionSubscription?.cancel();
-          
-          // Subscribe to playback position updates
-          _positionSubscription = _audioService.playbackStream?.listen(
-            (position) {
-              if (mounted) {
-                setState(() {
-                  _currentPosition = position;
-                });
-                _syncTranscriptScroll();
-              }
-            },
-            onError: (error) {
-              print('Playback stream error: $error');
-            },
-            onDone: () {
-              print('Playback finished');
-            },
-          );
-        } else {
-          print('Failed to start playback');
         }
       }
     }
   }
   
-  Future<void> _skipForward() async {
-    final newPosition = _currentPosition + const Duration(seconds: 10);
-    if (newPosition < _totalDuration) {
-      setState(() {
-        _currentPosition = newPosition;
-      });
-      await _audioService.seekTo(newPosition);
-    }
-  }
-  
-  Future<void> _skipBackward() async {
-    final newPosition = _currentPosition - const Duration(seconds: 10);
+  Future<void> _stopPlayback() async {
+    await _audioService.stopPlayback();
     setState(() {
-      _currentPosition = newPosition < Duration.zero ? Duration.zero : newPosition;
+      _isPlaying = false;
     });
-    await _audioService.seekTo(_currentPosition);
   }
   
   void _showEditTitleDialog() {

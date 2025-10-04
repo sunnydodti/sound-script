@@ -32,6 +32,10 @@ class AudioService {
     try {
       _player = FlutterSoundPlayer();
       await _player!.openPlayer();
+      
+      // Set default subscription duration for progress updates
+      await _player!.setSubscriptionDuration(const Duration(milliseconds: 100));
+      
       _isPlayerInitialized = true;
       return true;
     } catch (e) {
@@ -97,7 +101,7 @@ class AudioService {
   }
   
   // Play audio
-  Future<bool> playAudio(String path) async {
+  Future<bool> playAudio(String path, {Function? whenFinished}) async {
     if (!_isPlayerInitialized) {
       await initPlayer();
     }
@@ -108,8 +112,11 @@ class AudioService {
         codec: Codec.aacADTS,
         whenFinished: () {
           print('Playback finished');
+          whenFinished?.call();
         },
       );
+      
+      print('Player started, onProgress stream available: ${_player!.onProgress != null}');
       return true;
     } catch (e) {
       print('Error playing audio: $e');
@@ -150,6 +157,21 @@ class AudioService {
   // Get playback position stream
   Stream<Duration>? get playbackStream {
     return _player?.onProgress?.map((e) => e.position);
+  }
+  
+  // Seek to position
+  Future<void> seekTo(Duration position) async {
+    try {
+      await _player?.seekToPlayer(position);
+    } catch (e) {
+      print('Error seeking: $e');
+    }
+  }
+  
+  // Get current duration
+  Future<Duration?> getDuration(String path) async {
+    // For flutter_sound, duration is usually available during playback
+    return null;
   }
   
   // Dispose resources
