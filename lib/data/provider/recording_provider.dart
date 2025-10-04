@@ -303,7 +303,7 @@ class RecordingProvider with ChangeNotifier {
       // Get transcript result from service with status callbacks
       final result = await _transcriptionService.transcribeAudio(
         recording.filePath ?? '',
-        onStatusUpdate: (status, message) {
+        onStatusUpdate: (status, message) async {
           print('Transcription status: $status - $message');
           
           // Update recording status based on transcription service status
@@ -326,6 +326,14 @@ class RecordingProvider with ChangeNotifier {
             default:
               break;
           }
+          
+          // Persist status updates to storage immediately
+          recording.modified = DateTime.now();
+          final index = _recordings.indexWhere((r) => r.id == recording.id);
+          if (index != -1) {
+            await updateRecording(index, recording);
+          }
+          
           notifyListeners();
         },
       );
@@ -365,7 +373,10 @@ class RecordingProvider with ChangeNotifier {
         }
       }
       
-      recording.status = RecordingStatus.completed;
+      // Only set to completed if not already failed
+      if (recording.status != RecordingStatus.failed) {
+        recording.status = RecordingStatus.completed;
+      }
       recording.modified = DateTime.now();
       
       // Update in storage
@@ -375,16 +386,29 @@ class RecordingProvider with ChangeNotifier {
       }
       
       _isProcessing = false;
-      _successMessage = 'Transcription completed successfully!';
-      notifyListeners();
       
-      // Auto-clear success message after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
-        _successMessage = '';
-        notifyListeners();
-      });
+      // Only show success message if actually completed
+      if (recording.status == RecordingStatus.completed) {
+        _successMessage = 'Transcription completed successfully!';
+        
+        // Auto-clear success message after 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          _successMessage = '';
+          notifyListeners();
+        });
+      }
+      
+      notifyListeners();
     } catch (e) {
       recording.status = RecordingStatus.failed;
+      recording.modified = DateTime.now();
+      
+      // Persist the failed status to storage
+      final index = _recordings.indexWhere((r) => r.id == recording.id);
+      if (index != -1) {
+        await updateRecording(index, recording);
+      }
+      
       _errorMessage = 'Transcription failed: $e';
       _isProcessing = false;
       notifyListeners();
