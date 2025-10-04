@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../data/provider/recording_provider.dart';
+import '../data/theme.dart';
 import '../models/recording.dart';
 import '../models/transcript_segment.dart';
 import '../service/audio_service.dart';
@@ -537,7 +538,7 @@ class _DetailsPageState extends State<DetailsPage> {
     
     switch (widget.recording.status) {
       case RecordingStatus.recording:
-        color = theme.colorScheme.error;
+        color = recordingColor;
         label = 'Recording';
         break;
       case RecordingStatus.uploading:
@@ -553,7 +554,7 @@ class _DetailsPageState extends State<DetailsPage> {
         label = 'Completed';
         break;
       case RecordingStatus.failed:
-        color = theme.colorScheme.error;
+        color = recordingColor;
         label = 'Failed';
         break;
     }

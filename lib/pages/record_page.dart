@@ -498,24 +498,24 @@ class _RecordPageState extends State<RecordPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.errorContainer,
+                    color: recordingColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: theme.colorScheme.error.withOpacity(0.5),
+                      color: recordingColor.withOpacity(0.5),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.error_outline, 
-                        color: theme.colorScheme.onErrorContainer,
+                        color: recordingColor,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           recordingProvider.errorMessage,
                           style: TextStyle(
-                            color: theme.colorScheme.onErrorContainer,
+                            color: recordingColor,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -523,7 +523,7 @@ class _RecordPageState extends State<RecordPage> {
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => recordingProvider.clearError(),
-                        color: theme.colorScheme.onErrorContainer,
+                        color: recordingColor,
                       ),
                     ],
                   ),
@@ -696,7 +696,7 @@ class _RecordPageState extends State<RecordPage> {
                     : Icons.check_circle_outline,
             size: 80,
             color: recording.status == RecordingStatus.failed
-                ? theme.colorScheme.error
+                ? recordingColor
                 : isTranscribing
                     ? theme.colorScheme.primary
                     : Colors.green,
@@ -785,14 +785,14 @@ class _RecordPageState extends State<RecordPage> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: recording.status == RecordingStatus.failed
-                    ? theme.colorScheme.errorContainer
+                    ? recordingColor.withOpacity(0.15)
                     : recording.status == RecordingStatus.completed
                         ? Colors.green.withOpacity(0.1)
                         : theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: recording.status == RecordingStatus.failed
-                      ? theme.colorScheme.error.withOpacity(0.3)
+                      ? recordingColor.withOpacity(0.3)
                       : recording.status == RecordingStatus.completed
                           ? Colors.green.withOpacity(0.3)
                           : theme.colorScheme.primary.withOpacity(0.3),
@@ -858,7 +858,7 @@ class _RecordPageState extends State<RecordPage> {
                   ] else if (recording.status == RecordingStatus.failed) ...[
                     Icon(
                       Icons.error_outline,
-                      color: theme.colorScheme.onErrorContainer,
+                      color: recordingColor,
                       size: 32,
                     ),
                     const SizedBox(height: 16),
@@ -866,14 +866,14 @@ class _RecordPageState extends State<RecordPage> {
                       'Transcription Failed',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onErrorContainer,
+                        color: recordingColor,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Please check your connection and try again',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onErrorContainer.withOpacity(0.7),
+                        color: recordingColor.withOpacity(0.7),
                       ),
                       textAlign: TextAlign.center,
                     ),
