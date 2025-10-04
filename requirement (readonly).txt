@@ -73,3 +73,6 @@ Upload file: https://www.assemblyai.com/docs/api-reference/files/upload
 Transcribe: https://www.assemblyai.com/docs/api-reference/transcripts/submit
 get transcript: https://www.assemblyai.com/docs/api-reference/transcripts/get
 
+checkpoint - android development complete.
+
+begin progressive web app development

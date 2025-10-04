@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:file_picker/file_picker.dart';
@@ -30,6 +31,9 @@ class RecordingProvider with ChangeNotifier {
   bool _isProcessing = false;
   String _errorMessage = '';
   String _successMessage = '';
+  
+  // Cache for web file bytes (keyed by recording ID)
+  final Map<int, List<int>> _webFileBytes = {};
 
   List<Recording> get recordings {
     // Sort by creation date, newest first
@@ -243,8 +247,7 @@ class RecordingProvider with ChangeNotifier {
         allowMultiple: false,
       );
       
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
+      if (result != null) {
         final fileName = result.files.single.name;
         final fileSize = result.files.single.size;
         
@@ -265,24 +268,58 @@ class RecordingProvider with ChangeNotifier {
           return;
         }
         
-        // Check if file exists
-        if (!await file.exists()) {
-          _errorMessage = 'Selected file does not exist';
-          notifyListeners();
-          return;
-        }
+        String? filePath;
+        Duration? duration;
+        List<int>? webBytes;
         
-        // Get audio duration
-        final duration = await _audioService.getAudioDuration(file.path);
+        if (kIsWeb) {
+          // Web: Get file bytes for later upload
+          final bytes = result.files.single.bytes;
+          if (bytes == null) {
+            _errorMessage = 'Unable to read file bytes';
+            notifyListeners();
+            return;
+          }
+          
+          webBytes = bytes;
+          // Use file name as path identifier
+          filePath = fileName;
+          // For web, we'll estimate duration or set a default
+          duration = Duration.zero;
+        } else {
+          // Mobile: Use actual file path
+          if (result.files.single.path == null) {
+            _errorMessage = 'Unable to access file';
+            notifyListeners();
+            return;
+          }
+          
+          final file = File(result.files.single.path!);
+          
+          // Check if file exists
+          if (!await file.exists()) {
+            _errorMessage = 'Selected file does not exist';
+            notifyListeners();
+            return;
+          }
+          
+          filePath = file.path;
+          duration = await _audioService.getAudioDuration(file.path);
+        }
         
         // Create recording from file
         _currentRecording = Recording()
-          ..title = fileName.replaceAll(RegExp(r'\.(mp3|wav|aac|m4a|ogg|flac)$', caseSensitive: false), '')
-          ..filePath = file.path
+          ..title = fileName.replaceAll(RegExp(r'\.(mp3|wav|aac|m4a|ogg|flac|webm)$', caseSensitive: false), '')
+          ..filePath = filePath
           ..duration = duration ?? Duration.zero
           ..status = RecordingStatus.completed
           ..created = DateTime.now()
           ..modified = DateTime.now();
+        
+        // On web, cache the bytes with the recording ID
+        if (kIsWeb && webBytes != null) {
+          _webFileBytes[_currentRecording!.id] = webBytes;
+        }
         
         await addRecording(_currentRecording!);
         // Don't auto-transcribe, let user preview first
@@ -300,9 +337,13 @@ class RecordingProvider with ChangeNotifier {
       _isProcessing = true;
       notifyListeners();
       
+      // Get cached bytes for web uploads
+      final bytes = kIsWeb ? _webFileBytes[recording.id] : null;
+      
       // Get transcript result from service with status callbacks
       final result = await _transcriptionService.transcribeAudio(
         recording.filePath ?? '',
+        fileBytes: bytes,
         onStatusUpdate: (status, message) async {
           print('Transcription status: $status - $message');
           
@@ -435,9 +476,9 @@ class RecordingProvider with ChangeNotifier {
   // Delete recording
   Future<void> deleteRecording(int index) async {
     if (index >= 0 && index < _recordings.length) {
-      // Delete audio file
+      // Delete audio file (only on mobile)
       final recording = _recordings[index];
-      if (recording.filePath != null) {
+      if (recording.filePath != null && !kIsWeb) {
         try {
           final file = File(recording.filePath!);
           if (await file.exists()) {
@@ -447,6 +488,7 @@ class RecordingProvider with ChangeNotifier {
           print('Error deleting file: $e');
         }
       }
+      // On web, files are stored in browser memory and cleaned up automatically
       
       await deleteUrl(index);
     }

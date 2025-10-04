@@ -16,10 +16,18 @@ class AssemblyAiService implements TranscriptionService {
 
   // Step 1: Upload audio file
   @override
-  Future<String> uploadFile(String filePath) async {
+  Future<String> uploadFile(String filePath, {List<int>? fileBytes}) async {
     try {
-      final file = File(filePath);
-      final bytes = await file.readAsBytes();
+      List<int> bytes;
+      
+      if (fileBytes != null) {
+        // Use provided bytes (for web or when bytes are already in memory)
+        bytes = fileBytes;
+      } else {
+        // Read from file path (mobile)
+        final file = File(filePath);
+        bytes = await file.readAsBytes();
+      }
 
       final response = await http.post(
         Uri.parse('$_baseUrl/upload'),
@@ -91,12 +99,13 @@ class AssemblyAiService implements TranscriptionService {
   @override
   Future<Map<String, dynamic>> transcribeAudio(
     String filePath, {
+    List<int>? fileBytes,
     Function(TranscriptionStatus, String)? onStatusUpdate,
   }) async {
     try {
       // Step 1: Upload
       onStatusUpdate?.call(TranscriptionStatus.uploading, 'Uploading audio file...');
-      final uploadUrl = await uploadFile(filePath);
+      final uploadUrl = await uploadFile(filePath, fileBytes: fileBytes);
       
       // Step 2: Submit
       onStatusUpdate?.call(TranscriptionStatus.uploaded, 'Submitting transcription request...');

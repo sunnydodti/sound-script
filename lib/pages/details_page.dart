@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -694,12 +695,22 @@ class _DetailsPageState extends State<DetailsPage> {
       // If no transcript, share audio file
       if (widget.recording.filePath != null) {
         try {
-          final file = File(widget.recording.filePath!);
-          if (await file.exists()) {
-            await Share.shareXFiles(
-              [XFile(widget.recording.filePath!)],
-              text: widget.recording.title,
-            );
+          if (kIsWeb) {
+            // Web: Can't share files easily, just show message
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Audio sharing not available on web. Please use the transcript.')),
+              );
+            }
+          } else {
+            // Mobile: Share audio file
+            final file = File(widget.recording.filePath!);
+            if (await file.exists()) {
+              await Share.shareXFiles(
+                [XFile(widget.recording.filePath!)],
+                text: widget.recording.title,
+              );
+            }
           }
         } catch (e) {
           if (mounted) {

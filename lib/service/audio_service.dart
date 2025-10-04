@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -46,12 +47,20 @@ class AudioService {
   
   // Request microphone permission
   Future<bool> requestPermission() async {
+    if (kIsWeb) {
+      // Web: Browser will handle permission request automatically
+      return true;
+    }
     final status = await Permission.microphone.request();
     return status.isGranted;
   }
   
   // Check if permission is granted
   Future<bool> hasPermission() async {
+    if (kIsWeb) {
+      // Web: Browser will handle permission
+      return true;
+    }
     final status = await Permission.microphone.status;
     return status.isGranted;
   }
@@ -68,15 +77,30 @@ class AudioService {
     }
     
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final path = '${dir.path}/recording_$timestamp.aac';
+      String path;
       
-      await _recorder!.startRecorder(
-        toFile: path,
-        codec: Codec.aacADTS,
-        audioSource: AudioSource.microphone, // Only record from microphone, not system audio
-      );
+      if (kIsWeb) {
+        // Web: Use a simple identifier, actual data is stored in browser memory
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        path = 'recording_$timestamp.webm';
+        
+        await _recorder!.startRecorder(
+          toFile: path,
+          codec: Codec.opusWebM, // Web-compatible codec
+          audioSource: AudioSource.microphone,
+        );
+      } else {
+        // Mobile: Use file system
+        final dir = await getApplicationDocumentsDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        path = '${dir.path}/recording_$timestamp.aac';
+        
+        await _recorder!.startRecorder(
+          toFile: path,
+          codec: Codec.aacADTS,
+          audioSource: AudioSource.microphone,
+        );
+      }
       
       return path;
     } catch (e) {

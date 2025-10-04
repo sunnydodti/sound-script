@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -959,7 +960,7 @@ class _RecordPageState extends State<RecordPage> {
               ),
             
             // Retry button for failed transcriptions
-            if (recording.status == RecordingStatus.failed)
+            if (!kIsWeb && recording.status == RecordingStatus.failed)
               ElevatedButton.icon(
                 onPressed: () => provider.transcribeCurrentRecording(),
                 icon: const Icon(Icons.refresh),
