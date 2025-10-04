@@ -16,4 +16,8 @@ class Constants {
     }
     return 'https://$_apiBase';
   }
+
+  static String indexKey = 'index';
+
+  static String recordingHistoryKey = 'recording_history';
 }
