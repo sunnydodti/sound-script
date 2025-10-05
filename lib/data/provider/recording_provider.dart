@@ -1,12 +1,13 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:file_picker/file_picker.dart';
-// Conditional import for web blob support
-import 'dart:html' as html show Blob, Url;
-import 'dart:typed_data' show Uint8List;
+
+// Conditional imports for platform-specific code
+import 'recording_provider_stub.dart'
+    if (dart.library.html) 'recording_provider_web.dart'
+    if (dart.library.io) 'recording_provider_io.dart' as platform;
 
 import '../../models/recording.dart';
 import '../../models/transcript_segment.dart';
@@ -288,8 +289,12 @@ class RecordingProvider with ChangeNotifier {
           webBytes = bytes;
           
           // Create blob URL (temporary, will not persist after refresh)
-          final blob = html.Blob([Uint8List.fromList(bytes)]);
-          filePath = html.Url.createObjectUrlFromBlob(blob);
+          filePath = platform.createBlobUrl(bytes);
+          if (filePath == null) {
+            _errorMessage = 'Unable to create blob URL';
+            notifyListeners();
+            return;
+          }
           print('Created blob URL for picked file');
           
           // For web, we'll estimate duration or set a default
@@ -302,17 +307,15 @@ class RecordingProvider with ChangeNotifier {
             return;
           }
           
-          final file = File(result.files.single.path!);
+          filePath = result.files.single.path!;
           
           // Check if file exists
-          if (!await file.exists()) {
+          if (!await platform.fileExists(filePath)) {
             _errorMessage = 'Selected file does not exist';
             notifyListeners();
             return;
           }
-          
-          filePath = file.path;
-          duration = await _audioService.getAudioDuration(file.path);
+          duration = await _audioService.getAudioDuration(filePath);
         }
         
         // Create recording from file
@@ -345,8 +348,19 @@ class RecordingProvider with ChangeNotifier {
       _isProcessing = true;
       notifyListeners();
       
-      // Get cached bytes for web uploads (only from picked files)
-      List<int>? bytes = kIsWeb ? _webFileBytes[recording.id] : null;
+      // Get file bytes based on platform
+      List<int>? bytes;
+      if (kIsWeb) {
+        // On web, use cached bytes from picked files
+        bytes = _webFileBytes[recording.id];
+      } else {
+        // On mobile/desktop, read file from path
+        if (recording.filePath != null) {
+          print('📂 Reading file from path: ${recording.filePath}');
+          bytes = await platform.readFileBytes(recording.filePath!);
+          print('✅ Read ${bytes.length} bytes from file');
+        }
+      }
       
       // Get transcript result from service with status callbacks
       final result = await _transcriptionService.transcribeAudio(
@@ -491,10 +505,7 @@ class RecordingProvider with ChangeNotifier {
       final recording = _recordings[index];
       if (recording.filePath != null && !kIsWeb) {
         try {
-          final file = File(recording.filePath!);
-          if (await file.exists()) {
-            await file.delete();
-          }
+          await platform.deleteFile(recording.filePath!);
         } catch (e) {
           print('Error deleting file: $e');
         }

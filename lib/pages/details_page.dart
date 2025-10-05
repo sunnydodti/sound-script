@@ -1,11 +1,15 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+
+// Platform-specific imports
+import '../data/provider/recording_provider_stub.dart'
+    if (dart.library.html) '../data/provider/recording_provider_web.dart'
+    if (dart.library.io) '../data/provider/recording_provider_io.dart' as platform;
 
 import '../data/provider/recording_provider.dart';
 import '../data/theme.dart';
@@ -799,8 +803,7 @@ class _DetailsPageState extends State<DetailsPage> {
             }
           } else {
             // Mobile: Share audio file
-            final file = File(widget.recording.filePath!);
-            if (await file.exists()) {
+            if (await platform.fileExists(widget.recording.filePath!)) {
               await Share.shareXFiles(
                 [XFile(widget.recording.filePath!)],
                 text: widget.recording.title,

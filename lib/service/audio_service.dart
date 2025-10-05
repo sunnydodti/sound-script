@@ -5,42 +5,82 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class AudioService {
+  // Singleton pattern to avoid multiple flutter_sound instances
+  static final AudioService _instance = AudioService._internal();
+  factory AudioService() => _instance;
+  AudioService._internal();
+  
   FlutterSoundRecorder? _recorder;
   FlutterSoundPlayer? _player;
   
   bool _isRecorderInitialized = false;
   bool _isPlayerInitialized = false;
+  bool _recorderCreationFailed = false; // Track if creation has failed
   
   // Initialize recorder
   Future<bool> initRecorder() async {
-    if (_isRecorderInitialized) return true;
+    // If already initialized successfully, return true
+    if (_isRecorderInitialized && _recorder != null) return true;
+    
+    // If creation has failed before, don't try again (would create multiple instances)
+    if (_recorderCreationFailed) {
+      print('⚠️ Recorder initialization previously failed. Please reload the page.');
+      return false;
+    }
+    
+    // If recorder exists but isn't initialized, something went wrong
+    if (_recorder != null && !_isRecorderInitialized) {
+      print('⚠️ Recorder in bad state. Please reload the page.');
+      _recorderCreationFailed = true;
+      return false;
+    }
     
     try {
+      // Create recorder instance - this should only happen ONCE per app lifecycle
+      print('🎤 Creating FlutterSoundRecorder instance...');
       _recorder = FlutterSoundRecorder();
+      
+      print('🎤 Opening recorder...');
       await _recorder!.openRecorder();
+      
       _isRecorderInitialized = true;
+      _recorderCreationFailed = false;
+      print('✅ Recorder initialized successfully');
       return true;
     } catch (e) {
-      print('Error initializing recorder: $e');
+      print('❌ Error initializing recorder: $e');
+      print('⚠️ Please reload the page to reset the audio system.');
+      
+      // Mark as failed to prevent retry (which would create another instance)
+      _recorderCreationFailed = true;
+      _isRecorderInitialized = false;
+      
+      // Keep _recorder object to prevent ??= from creating another instance
       return false;
     }
   }
   
   // Initialize player
   Future<bool> initPlayer() async {
-    if (_isPlayerInitialized) return true;
+    if (_isPlayerInitialized && _player != null) return true;
     
     try {
-      _player = FlutterSoundPlayer();
-      await _player!.openPlayer();
+      // Only create if it doesn't exist
+      _player ??= FlutterSoundPlayer();
       
-      // Set default subscription duration for progress updates
-      await _player!.setSubscriptionDuration(const Duration(milliseconds: 100));
-      
-      _isPlayerInitialized = true;
+      // Only open if not already opened
+      if (!_isPlayerInitialized) {
+        await _player!.openPlayer();
+        
+        // Set default subscription duration for progress updates
+        await _player!.setSubscriptionDuration(const Duration(milliseconds: 100));
+        
+        _isPlayerInitialized = true;
+      }
       return true;
     } catch (e) {
       print('Error initializing player: $e');
+      _isPlayerInitialized = false;
       return false;
     }
   }
@@ -242,6 +282,8 @@ class AudioService {
     try {
       await _recorder?.closeRecorder();
       await _player?.closePlayer();
+      _recorder = null;
+      _player = null;
       _isRecorderInitialized = false;
       _isPlayerInitialized = false;
     } catch (e) {

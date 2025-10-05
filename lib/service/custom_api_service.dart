@@ -10,6 +10,17 @@ import 'package:soundscript/service/transcription_service_interface.dart';
 class CustomApiService implements TranscriptionService {
   final String _baseUrl = ApiConfig.apiBaseUrl;
 
+  /// Log API calls with details
+  void _logApiCall(String method, String url, {Map<String, dynamic>? body, Map<String, String>? headers}) {
+    final bodyStr = body != null ? ' Body: ${json.encode(body)}' : '';
+    print('🌐 $method $url$bodyStr');
+  }
+
+  /// Log API response
+  void _logApiResponse(int statusCode, String body) {
+    print('✅ $statusCode ${body.length > 100 ? body.substring(0, 100) + '...' : body}');
+  }
+
   Map<String, String> get _headers => {
         'content-type': 'application/json',
       };
@@ -21,12 +32,13 @@ class CustomApiService implements TranscriptionService {
       List<int> bytes;
       
       if (fileBytes != null) {
-        // Use provided bytes (for web or when bytes are already in memory)
+        // Use provided bytes (passed from caller)
+        print('📦 Using provided bytes: ${fileBytes.length} bytes');
         bytes = fileBytes;
       } else {
         // Check if it's a blob URL (web recording)
         if (filePath.startsWith('blob:')) {
-          // Fetch blob URL using http package
+          print('🌐 Fetching blob URL: $filePath');
           final response = await http.get(Uri.parse(filePath));
           if (response.statusCode == 200) {
             bytes = response.bodyBytes;
@@ -34,18 +46,25 @@ class CustomApiService implements TranscriptionService {
             throw Exception('Failed to fetch blob URL: ${response.statusCode}');
           }
         } else {
-          // File path not supported on web - should always use fileBytes or blob URL
-          throw Exception('File path reading not supported on web platform');
+          // On mobile platforms, fileBytes should always be provided
+          // This path should never be hit due to recording_provider passing fileBytes
+          throw Exception('fileBytes parameter is required. File path: $filePath');
         }
       }
 
+      final uploadUrl = '$_baseUrl/upload';
+      final uploadHeaders = {'content-type': 'application/octet-stream'};
+      
+      _logApiCall('POST', uploadUrl, headers: uploadHeaders);
+      print('📦 Body: Binary audio data (${bytes.length} bytes)');
+
       final response = await http.post(
-        Uri.parse('$_baseUrl/upload'),
-        headers: {
-          'content-type': 'application/octet-stream',
-        },
+        Uri.parse(uploadUrl),
+        headers: uploadHeaders,
         body: bytes,
       );
+
+      _logApiResponse(response.statusCode, response.body);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -54,6 +73,7 @@ class CustomApiService implements TranscriptionService {
         throw Exception('Upload failed: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
+      print('❌ Upload error: $e');
       throw Exception('Upload error: $e');
     }
   }
@@ -62,16 +82,23 @@ class CustomApiService implements TranscriptionService {
   @override
   Future<String> submitTranscription(String uploadUrl) async {
     try {
+      final transcribeUrl = '$_baseUrl/transcribe';
+      final requestBody = {
+        'audio_url': uploadUrl,
+        'language_code': 'en',
+        'punctuate': true,
+        'format_text': true,
+      };
+
+      _logApiCall('POST', transcribeUrl, headers: _headers, body: requestBody);
+
       final response = await http.post(
-        Uri.parse('$_baseUrl/transcribe'),
+        Uri.parse(transcribeUrl),
         headers: _headers,
-        body: json.encode({
-          'audio_url': uploadUrl,
-          'language_code': 'en',
-          'punctuate': true,
-          'format_text': true,
-        }),
+        body: json.encode(requestBody),
       );
+
+      _logApiResponse(response.statusCode, response.body);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -80,6 +107,7 @@ class CustomApiService implements TranscriptionService {
         throw Exception('Transcription submit failed: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
+      print('❌ Transcription submit error: $e');
       throw Exception('Transcription submit error: $e');
     }
   }
@@ -88,10 +116,16 @@ class CustomApiService implements TranscriptionService {
   @override
   Future<Map<String, dynamic>> getTranscript(String transcriptId) async {
     try {
+      final transcriptUrl = '$_baseUrl/transcript/$transcriptId';
+      
+      _logApiCall('GET', transcriptUrl, headers: _headers);
+
       final response = await http.get(
-        Uri.parse('$_baseUrl/transcript/$transcriptId'),
+        Uri.parse(transcriptUrl),
         headers: _headers,
       );
+
+      _logApiResponse(response.statusCode, response.body);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -100,6 +134,7 @@ class CustomApiService implements TranscriptionService {
         throw Exception('Get transcript failed: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
+      print('❌ Get transcript error: $e');
       throw Exception('Get transcript error: $e');
     }
   }
