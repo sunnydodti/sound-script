@@ -771,16 +771,50 @@ class _DetailsPageState extends State<DetailsPage> {
             labelText: 'Recording Title',
             border: OutlineInputBorder(),
           ),
+          autofocus: !kIsWeb, // Auto-focus on mobile/desktop, not on web to avoid pointer issues
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              controller.dispose();
+              Navigator.pop(context);
+            },
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              // Update title logic would go here
-              Navigator.pop(context);
+            onPressed: () async {
+              final newTitle = controller.text.trim();
+              if (newTitle.isNotEmpty && newTitle != widget.recording.title) {
+                try {
+                  // Find the recording index in the provider
+                  final provider = Provider.of<RecordingProvider>(context, listen: false);
+                  final index = provider.recordings.indexWhere((r) => r.id == widget.recording.id);
+                  
+                  if (index != -1) {
+                    await provider.updateRecordingTitle(index, newTitle);
+                    if (mounted) {
+                      // Update the local widget's recording title for immediate UI update
+                      setState(() {
+                        widget.recording.title = newTitle;
+                      });
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Title updated successfully')),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error updating title: $e')),
+                    );
+                  }
+                }
+              }
+              controller.dispose();
+              if (mounted) {
+                Navigator.pop(context);
+              }
             },
             child: const Text('Save'),
           ),
