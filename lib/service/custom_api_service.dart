@@ -1,19 +1,16 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:soundscript/data/api_config.dart';
 import 'package:soundscript/models/transcript_segment.dart';
 import 'package:soundscript/service/transcription_service_interface.dart';
 
-/// Custom API Service - Wrapper around your own backend API
-/// Your backend will proxy requests to AssemblyAI
-/// Responses follow the same structure as AssemblyAI
+/// Sound Script API Service
+/// Connects to the Sound Script backend for audio transcription
+/// No authentication required - open API
 class CustomApiService implements TranscriptionService {
-  final String _apiKey = ApiConfig.assemblyAiApiKey; // Your custom API key
-  final String _baseUrl = 'https://your-api-domain.com/api/v1'; // Your API base URL
+  final String _baseUrl = ApiConfig.apiBaseUrl;
 
   Map<String, String> get _headers => {
-        'authorization': 'Bearer $_apiKey',
         'content-type': 'application/json',
       };
 
@@ -37,16 +34,14 @@ class CustomApiService implements TranscriptionService {
             throw Exception('Failed to fetch blob URL: ${response.statusCode}');
           }
         } else {
-          // Read from file path (mobile)
-          final file = File(filePath);
-          bytes = await file.readAsBytes();
+          // File path not supported on web - should always use fileBytes or blob URL
+          throw Exception('File path reading not supported on web platform');
         }
       }
 
       final response = await http.post(
         Uri.parse('$_baseUrl/upload'),
         headers: {
-          'authorization': 'Bearer $_apiKey',
           'content-type': 'application/octet-stream',
         },
         body: bytes,
