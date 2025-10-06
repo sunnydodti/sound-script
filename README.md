@@ -1,4 +1,4 @@
-# SoundScript
+# <img src="docs/images/icon.png" width="40" alt="SoundScript Logo" style="vertical-align: middle;"> SoundScript
 
 Convert speech to text with intelligent transcription | Built with Flutter
 
