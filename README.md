@@ -1,6 +1,6 @@
 # SoundScript
 
-Convert speech to text with intelligent transcription
+Convert speech to text with intelligent transcription | Built with Flutter
 
 [![Download APK](https://img.shields.io/badge/Download-Android%20APK-green?style=for-the-badge)](https://github.com/sunnydodti/sound-script/releases/latest)
 
@@ -38,6 +38,18 @@ Record audio and get accurate text transcriptions with word-level timestamps.
 **Permissions**: Microphone access, Internet connection
 
 [Download APK](https://github.com/sunnydodti/sound-script/releases/latest) | [Try Web App](https://soundscript.persist.site) | [Issues](https://github.com/sunnydodti/sound-script/issues)
+
+## Flutter App Details
+
+**Built with Flutter** - Cross-platform mobile and web application framework
+
+**Architecture**: 
+- **App**: Flutter SDK 3.27.1+ with Dart 3.6.0+
+- **State Management**: Provider pattern for reactive UI updates
+- **Local Storage**: Hive database for offline recording management
+- **Audio Processing**: flutter_sound package for recording and playback
+- **HTTP Client**: Custom API service with comprehensive logging
+- **Platform Support**: Conditional imports for web/mobile compatibility
 
 ## Gallery
 
