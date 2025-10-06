@@ -4,7 +4,10 @@ on:
     branches:
       - main
     paths-ignore:
-      - '**.md'
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
+      - 'README.md'
 
 jobs:
   build-info:
