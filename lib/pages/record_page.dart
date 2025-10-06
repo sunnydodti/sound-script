@@ -40,12 +40,15 @@ class _RecordPageState extends State<RecordPage> {
   }
   
   void _initSpeech() async {
+    print('🎙️ INIT: Initializing speech recognition...');
     _speechToText = stt.SpeechToText();
     _speechEnabled = await _speechToText.initialize();
+    print('🎙️ INIT: Speech recognition enabled: $_speechEnabled');
     setState(() {});
   }
   
   void _startLiveListening() async {
+    print('🎯 FUNCTION: _startLiveListening called');
     final recordingProvider = context.read<RecordingProvider>();
     
     // Reset button state when starting new recording
@@ -55,8 +58,11 @@ class _RecordPageState extends State<RecordPage> {
     });
     
     // Start audio recording
+    print('🎤 Starting live recording through provider...');
     final started = await recordingProvider.startLiveRecording();
+    print('🎤 Live recording started: $started');
     if (!started) {
+      print('❌ Failed to start live recording');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to start audio recording')),
@@ -69,9 +75,11 @@ class _RecordPageState extends State<RecordPage> {
     _liveSegments.clear();
     _liveTranscript = '';
     
+    print('🎙️ Starting speech recognition...');
     // Start speech recognition with continuous listening
     await _speechToText.listen(
       onResult: (result) {
+        print('🗣️ Speech result: "${result.recognizedWords}" (final: ${result.finalResult})');
         final now = DateTime.now();
         final elapsedMs = now.difference(_liveStartTime!).inMilliseconds;
         
@@ -118,14 +126,18 @@ class _RecordPageState extends State<RecordPage> {
   }
   
   void _stopLiveListening() async {
+    print('🛑 FUNCTION: _stopLiveListening called');
     final recordingProvider = context.read<RecordingProvider>();
     
     // Stop audio recording
+    print('🎤 Stopping live recording through provider...');
     await recordingProvider.stopLiveRecording();
     
     // Stop speech recognition
+    print('🎙️ Stopping speech recognition...');
     await _speechToText.stop();
     setState(() => _isListening = false);
+    print('✅ Live listening stopped');
   }
   
   void _showTranscriptionOptions(BuildContext context) async {
@@ -471,6 +483,7 @@ class _RecordPageState extends State<RecordPage> {
                   ],
                   selected: {_selectedMode},
                   onSelectionChanged: (Set<RecordingMode> newSelection) {
+                    print('🔄 MODE: Changed to ${newSelection.first}');
                     setState(() {
                       _selectedMode = newSelection.first;
                       _liveTranscript = '';
@@ -521,7 +534,11 @@ class _RecordPageState extends State<RecordPage> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
-                        onPressed: () => recordingProvider.clearError(),
+                        onPressed: () {
+                          print('❌ BUTTON: Clear Error pressed');
+                          print('🚨 Error Message: ${recordingProvider.errorMessage}');
+                          recordingProvider.clearError();
+                        },
                         color: recordingColor,
                       ),
                     ],
@@ -571,7 +588,10 @@ class _RecordPageState extends State<RecordPage> {
             ),
             const SizedBox(height: 48),
             ElevatedButton.icon(
-              onPressed: () => provider.stopRecording(),
+              onPressed: () {
+                print('🛑 BUTTON: Stop Recording pressed');
+                provider.stopRecording();
+              },
               icon: const Icon(Icons.stop),
               label: const Text('Stop Recording'),
               style: ElevatedButton.styleFrom(
@@ -594,6 +614,8 @@ class _RecordPageState extends State<RecordPage> {
           const SizedBox(height: 48),
           ElevatedButton.icon(
             onPressed: provider.isProcessing ? null : () {
+              print('🎤 BUTTON: Start Recording pressed');
+              print('📊 Recording State: isProcessing=${provider.isProcessing}');
               setState(() {
                 _dismissedViewButton = true; // Hide button when starting new recording
                 _completedRecording = null; // Clear the completed recording reference
@@ -921,7 +943,10 @@ class _RecordPageState extends State<RecordPage> {
                           icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
                           iconSize: 64,
                           color: theme.colorScheme.primary,
-                          onPressed: () => provider.togglePreviewPlayback(),
+                          onPressed: () {
+                            print('▶️ BUTTON: Preview Playback ${isPlaying ? "Pause" : "Play"} pressed');
+                            provider.togglePreviewPlayback();
+                          },
                         ),
                       ],
                     ),
@@ -946,7 +971,11 @@ class _RecordPageState extends State<RecordPage> {
               ElevatedButton.icon(
                 onPressed: provider.isProcessing 
                     ? null 
-                    : () => provider.transcribeCurrentRecording(),
+                    : () {
+                        print('🔤 BUTTON: Transcribe Audio pressed');
+                        print('📊 Provider State: isProcessing=${provider.isProcessing}');
+                        provider.transcribeCurrentRecording();
+                      },
                 icon: const Icon(Icons.transcribe),
                 label: const Text('Transcribe Audio'),
                 style: ElevatedButton.styleFrom(
@@ -960,7 +989,11 @@ class _RecordPageState extends State<RecordPage> {
             // Retry button for failed transcriptions
             if (!kIsWeb && recording.status == RecordingStatus.failed)
               ElevatedButton.icon(
-                onPressed: () => provider.transcribeCurrentRecording(),
+                onPressed: () {
+                  print('🔄 BUTTON: Retry Transcription pressed');
+                  print('📊 Recording Status: ${recording.status}');
+                  provider.transcribeCurrentRecording();
+                },
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry Transcription'),
                 style: ElevatedButton.styleFrom(
@@ -976,6 +1009,8 @@ class _RecordPageState extends State<RecordPage> {
             // New recording button
             OutlinedButton.icon(
               onPressed: () {
+                print('🔄 BUTTON: Record Again/Select Another File pressed');
+                print('📊 Mode: ${_selectedMode}');
                 provider.resetCurrentRecording();
                 // Reset local state tracking
                 setState(() {
@@ -1042,7 +1077,15 @@ class _RecordPageState extends State<RecordPage> {
           const SizedBox(height: 48),
           ElevatedButton.icon(
             onPressed: _speechEnabled 
-                ? (_isListening ? _stopLiveListening : _startLiveListening)
+                ? (_isListening ? () {
+                    print('🛑 BUTTON: Stop Live Listening pressed');
+                    print('📊 Live State: speechEnabled=$_speechEnabled, isListening=$_isListening');
+                    _stopLiveListening();
+                  } : () {
+                    print('🎤 BUTTON: Start Live Listening pressed');
+                    print('📊 Live State: speechEnabled=$_speechEnabled, isListening=$_isListening');
+                    _startLiveListening();
+                  })
                 : null,
             icon: Icon(_isListening ? Icons.stop : Icons.mic),
             label: Text(_isListening ? 'Stop Listening' : 'Start Listening'),
@@ -1088,7 +1131,11 @@ class _RecordPageState extends State<RecordPage> {
             if (!_isListening) ...[
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: () => _showTranscriptionOptions(context),
+                onPressed: () {
+                  print('💾 BUTTON: Save Live Transcription pressed');
+                  print('📝 Transcript Length: ${_liveTranscript.length} chars');
+                  _showTranscriptionOptions(context);
+                },
                 icon: const Icon(Icons.save),
                 label: const Text('Save Transcription'),
                 style: ElevatedButton.styleFrom(
@@ -1189,6 +1236,8 @@ class _RecordPageState extends State<RecordPage> {
           const SizedBox(height: 48),
           OutlinedButton.icon(
             onPressed: provider.isProcessing ? null : () {
+              print('📁 BUTTON: Choose Audio File pressed');
+              print('📊 Provider State: isProcessing=${provider.isProcessing}');
               setState(() {
                 _dismissedViewButton = true; // Hide button when selecting new file
                 _completedRecording = null; // Clear the completed recording reference
@@ -1203,7 +1252,10 @@ class _RecordPageState extends State<RecordPage> {
           ),
           const SizedBox(height: 16),
           TextButton.icon(
-            onPressed: () => _showFileRequirements(context),
+            onPressed: () {
+              print('ℹ️ BUTTON: File Requirements Info pressed');
+              _showFileRequirements(context);
+            },
             icon: const Icon(Icons.info_outline, size: 18),
             label: const Text(
               'File Requirements (Max 50 MB)',

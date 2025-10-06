@@ -88,8 +88,26 @@ class AudioService {
   // Request microphone permission
   Future<bool> requestPermission() async {
     if (kIsWeb) {
-      // Web: Browser will handle permission request automatically
-      return true;
+      // Web: Check HTTPS and browser support
+      try {
+        print('🌐 Web: Checking microphone access...');
+        
+        // Check if we're on HTTPS (required for production microphone access)
+        final isSecure = Uri.base.scheme == 'https' || Uri.base.host == 'localhost';
+        if (!isSecure) {
+          print('❌ Web: Microphone requires HTTPS in production. Current: ${Uri.base.scheme}://${Uri.base.host}');
+          return false;
+        }
+        
+        // Check if MediaDevices API is available
+        if (!kIsWeb) return true; // This is for web only
+        
+        print('✅ Web: HTTPS check passed. Browser will handle permission request.');
+        return true;
+      } catch (e) {
+        print('❌ Web: Error checking permissions: $e');
+        return false;
+      }
     }
     final status = await Permission.microphone.request();
     return status.isGranted;
@@ -107,15 +125,26 @@ class AudioService {
   
   // Start recording
   Future<String?> startRecording() async {
+    print('🎤 Starting recording...');
+    
     if (!_isRecorderInitialized) {
-      await initRecorder();
+      print('🎤 Initializing recorder...');
+      final success = await initRecorder();
+      if (!success) {
+        print('❌ Failed to initialize recorder');
+        return null;
+      }
     }
     
     if (!await hasPermission()) {
+      print('🎤 Requesting microphone permission...');
       final granted = await requestPermission();
-      if (!granted) return null;
+      if (!granted) {
+        print('❌ Microphone permission denied');
+        return null;
+      }
     }
-    
+
     try {
       String path;
       
@@ -124,38 +153,56 @@ class AudioService {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         path = 'recording_$timestamp.webm';
         
+        print('🌐 Web: Starting recording with path: $path');
+        
         await _recorder!.startRecorder(
           toFile: path,
           codec: Codec.opusWebM, // Web-compatible codec
           audioSource: AudioSource.microphone,
         );
+        
+        print('✅ Web: Recording started successfully');
       } else {
         // Mobile: Use file system
         final dir = await getApplicationDocumentsDirectory();
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         path = '${dir.path}/recording_$timestamp.aac';
         
+        print('📱 Mobile: Starting recording with path: $path');
+        
         await _recorder!.startRecorder(
           toFile: path,
           codec: Codec.aacADTS,
           audioSource: AudioSource.microphone,
         );
+        
+        print('✅ Mobile: Recording started successfully');
       }
       
       return path;
     } catch (e) {
-      print('Error starting recording: $e');
+      print('❌ Error starting recording: $e');
+      if (kIsWeb) {
+        print('💡 Web recording troubleshooting:');
+        print('   - Ensure site is served over HTTPS');
+        print('   - Check browser console for permission errors');
+        print('   - Try allowing microphone in browser settings');
+        print('   - Current URL: ${Uri.base}');
+      }
       return null;
     }
-  }
-  
-  // Stop recording
+  }  // Stop recording
   Future<String?> stopRecording() async {
+    print('🛑 Stopping recording...');
     try {
       final path = await _recorder!.stopRecorder();
+      print('✅ Recording stopped successfully. Path: $path');
       return path;
     } catch (e) {
-      print('Error stopping recording: $e');
+      print('❌ Error stopping recording: $e');
+      if (kIsWeb) {
+        print('💡 Web recording stop issues may indicate permission or codec problems');
+      }
       return null;
     }
   }
@@ -167,7 +214,10 @@ class AudioService {
   
   // Play audio
   Future<bool> playAudio(String path, {Function? whenFinished}) async {
+    print('▶️ Starting playback: $path');
+    
     if (!_isPlayerInitialized) {
+      print('🔧 Initializing player...');
       await initPlayer();
     }
     
@@ -176,43 +226,56 @@ class AudioService {
         fromURI: path,
         codec: Codec.aacADTS,
         whenFinished: () {
-          print('Playback finished');
+          print('🏁 Playback finished');
           whenFinished?.call();
         },
       );
       
-      print('Player started, onProgress stream available: ${_player!.onProgress != null}');
+      print('✅ Player started successfully');
+      print('🔊 Progress stream available: ${_player!.onProgress != null}');
       return true;
     } catch (e) {
-      print('Error playing audio: $e');
+      print('❌ Error playing audio: $e');
+      if (kIsWeb) {
+        print('💡 Web playback troubleshooting:');
+        print('   - Check if audio format is supported');
+        print('   - Ensure audio file exists');
+        print('   - Browser may block autoplay');
+      }
       return false;
     }
   }
   
   // Stop playback
   Future<void> stopPlayback() async {
+    print('⏹️ Stopping playback...');
     try {
       await _player?.stopPlayer();
+      print('✅ Playback stopped');
     } catch (e) {
-      print('Error stopping playback: $e');
+      print('❌ Error stopping playback: $e');
     }
   }
   
   // Pause playback
   Future<void> pausePlayback() async {
+    print('⏸️ Pausing playback...');
     try {
       await _player?.pausePlayer();
+      print('✅ Playback paused');
     } catch (e) {
-      print('Error pausing playback: $e');
+      print('❌ Error pausing playback: $e');
     }
   }
   
   // Resume playback
   Future<void> resumePlayback() async {
+    print('▶️ Resuming playback...');
     try {
       await _player?.resumePlayer();
+      print('✅ Playback resumed');
     } catch (e) {
-      print('Error resuming playback: $e');
+      print('❌ Error resuming playback: $e');
     }
   }
   
