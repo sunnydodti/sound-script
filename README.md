@@ -40,10 +40,14 @@ Record audio and get accurate text transcriptions with word-level timestamps.
 ## Gallery
 
 **Dark Mode**
-![Dark Mode 1](docs/images/mobile/dark-mode-1.jpg) ![Dark Mode 2](docs/images/mobile/dark-mode-2.jpg) ![Dark Mode 3](docs/images/mobile/dark-mode-3.jpg) ![Dark Mode 4](docs/images/mobile/dark-mode-4.jpg)
+
+![Dark Mode 1](docs/images/mobile/dark-mode-1.jpg) | ![Dark Mode 2](docs/images/mobile/dark-mode-2.jpg) | ![Dark Mode 3](docs/images/mobile/dark-mode-3.jpg) | ![Dark Mode 4](docs/images/mobile/dark-mode-4.jpg)
+--- | --- | --- | ---
 
 **Light Mode**
-![Light Mode 1](docs/images/mobile/light-mode-1.jpg) ![Light Mode 2](docs/images/mobile/light-mode-2.jpg) ![Light Mode 3](docs/images/mobile/light-mode-3.jpg)
+
+![Light Mode 1](docs/images/mobile/light-mode-1.jpg) | ![Light Mode 2](docs/images/mobile/light-mode-2.jpg) | ![Light Mode 3](docs/images/mobile/light-mode-3.jpg)
+--- | --- | ---
 
 <!-- **Web UI**
 ![Web UI 1](docs/images/web-ui-1.jpg) ![Web UI 2](docs/images/web-ui-2.jpg) ![Web UI 3](docs/images/web-ui-3.jpg) -->
