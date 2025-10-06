@@ -4,7 +4,7 @@ Convert speech to text with intelligent transcription
 
 [![Download APK](https://img.shields.io/badge/Download-Android%20APK-green?style=for-the-badge)](https://github.com/sunnydodti/sound-script/releases/latest)
 
-[![Try Web App](https://img.shields.io/badge/Try-Web%20App-blue?style=for-the-badge)](https://sound-script.persist.site)
+[![Try Web App](https://img.shields.io/badge/Try-Web%20App-blue?style=for-the-badge)](https://soundscript.persist.site)
 
 Record audio and get accurate text transcriptions with word-level timestamps.
 
