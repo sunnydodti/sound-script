@@ -8,7 +8,7 @@ Convert speech to text with intelligent transcription
 
 Record audio and get accurate text transcriptions with word-level timestamps.
 
-![App Screenshot](docs/images/mobile/dark-mode-1.jpg)
+<img src="docs/images/mobile/dark-mode-1.jpg" width="300" alt="App Screenshot">
 
 ## How It Works
 
@@ -26,6 +26,8 @@ Record audio and get accurate text transcriptions with word-level timestamps.
 - Transcription processing with real-time status
 - Word-level timing for synchronized playback
 - Live streaming transcription support
+
+## Details
 
 **Features**: High-quality recording, real-time transcription, synchronized playback, cross-platform support
 
@@ -49,5 +51,8 @@ Record audio and get accurate text transcriptions with word-level timestamps.
 ![Light Mode 1](docs/images/mobile/light-mode-1.jpg) | ![Light Mode 2](docs/images/mobile/light-mode-2.jpg) | ![Light Mode 3](docs/images/mobile/light-mode-3.jpg)
 --- | --- | ---
 
-<!-- **Web UI**
-![Web UI 1](docs/images/web-ui-1.jpg) ![Web UI 2](docs/images/web-ui-2.jpg) ![Web UI 3](docs/images/web-ui-3.jpg) -->
+**Web UI**
+
+Desktop View | Mobile Web
+--- | ---
+![Web Desktop](docs/images/web/web-1.png) | ![Web Mobile](docs/images/web/web-2.jpg)
