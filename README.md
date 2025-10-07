@@ -27,6 +27,8 @@ Record audio and get accurate text transcriptions with word-level timestamps.
 - Word-level timing for synchronized playback
 - Live streaming transcription support
 
+**API Backend**: [sound-script-api](https://github.com/sunnydodti/sound-script-api) - TypeScript API built with Hono + Cloudflare wrapper around AssemblyAI
+
 ## Details
 
 **Features**: High-quality recording, real-time transcription, synchronized playback, cross-platform support
